@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="FastAPI 全模态流式 — 视觉 / 语音 / 实时流多模态 AI 的实战手册。">
+<title>FastAPI 全模态流式 — MiniCPM-V & o Cookbook</title>
+<link rel="icon" type="image/png" href="../../../assets/logos/openbmb.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
+<style>
+:root {
+  --primary: #3680ff;
+  --accent:  #1AC8DB;
+  --sidebar-w: 280px;
+  --bg: #fff;
+  --bg-side: #fafbfc;
+  --bg-code: #f6f8fa;
+  --c1: #24292f;
+  --c2: #57606a;
+  --c3: #8b949e;
+  --border: #d0d7de;
+  --nav-active-bg: rgba(54, 128, 255, .08);
+  --nav-active-fg: var(--primary);
+  --link: var(--primary);
+  --warn-bg: #fff8c5;
+  --warn-bd: #d4a72c;
+  --note-bg: #ddf4ff;
+  --note-bd: #54aeff;
+  --tip-bg:  #dafbe1;
+  --tip-bd:  #1f883d;
+  --important-bg: #fbefff;
+  --important-bd: #8250df;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+               "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  color: var(--c1);
+  line-height: 1.65;
+  background: var(--bg);
+  font-size: 15px;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 18px;
+}
+.topbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-brand img { height: 30px; }
+.topbar-brand .brand-text { font-weight: 600; font-size: 15px; color: var(--c1); white-space: nowrap; }
+.topbar-search { flex: 1; max-width: 480px; position: relative; }
+.topbar-search input {
+  width: 100%; padding: 8px 12px 8px 34px; font-size: 14px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-side);
+  outline: none; transition: border-color .15s;
+}
+.topbar-search input:focus { border-color: var(--primary); }
+.topbar-search::before {
+  content: "🔍"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; opacity: .5;
+}
+.topbar-actions { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+.topbar-actions a { color: var(--c2); }
+.topbar-actions a:hover { color: var(--primary); }
+.topbar-toggle {
+  display: none; background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 10px; font-size: 16px; cursor: pointer;
+}
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  position: fixed; top: 56px; left: 0; bottom: 0; width: var(--sidebar-w);
+  overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border);
+  padding: 16px 0 32px;
+  transition: transform .25s;
+}
+.sidebar-header { padding: 4px 18px 14px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.sidebar-lang-switch {
+  display: inline-block; font-size: 12px; color: var(--primary);
+  text-decoration: none; padding: 3px 12px;
+  border: 1px solid var(--border); border-radius: 999px;
+  transition: background .15s, border-color .15s;
+}
+.sidebar-lang-switch:hover { background: var(--nav-active-bg); border-color: var(--primary); text-decoration: none; }
+.sidebar-lang-switch::before { content: "🌐 "; opacity: .8; margin-right: 2px; }
+
+.version-switcher { padding: 0 18px 12px; }
+.version-switcher select {
+  width: 100%; padding: 7px 10px; font-size: 14px;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  cursor: pointer; outline: none;
+}
+.version-switcher .badge {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; font-size: 11px;
+  border-radius: 999px; background: var(--accent); color: #fff;
+  vertical-align: middle; font-weight: 600;
+}
+.nav-list { list-style: none; padding: 4px 12px; }
+.nav-list a { display: block; padding: 6px 12px; color: var(--c2); border-radius: 6px;
+              font-size: 14px; transition: background .15s, color .15s; }
+.nav-list a:hover { background: #ebeff3; color: var(--c1); text-decoration: none; }
+.nav-list a.active { background: var(--nav-active-bg); color: var(--nav-active-fg); font-weight: 600; }
+.nav-group { margin-top: 8px; }
+.nav-group-header {
+  padding: 6px 12px; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--c1); cursor: pointer;
+  user-select: none; display: flex; align-items: center; gap: 6px;
+  border-radius: 6px; transition: background .15s;
+}
+.nav-group-header:hover { background: #ebeff3; }
+.nav-group-header::before {
+  content: ""; width: 0; height: 0;
+  border-left: 5px solid var(--c2); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform .2s; transform: rotate(90deg);
+}
+.nav-group.collapsed .nav-group-header::before { transform: rotate(0); }
+.nav-group-children { list-style: none; margin: 2px 0 4px 22px; padding-left: 12px;
+                       border-left: 2px solid #e3e7ed;
+                       max-height: 800px; overflow: hidden;
+                       transition: max-height .25s ease, opacity .2s ease, padding .2s ease;
+                       opacity: 1; }
+.nav-group.collapsed .nav-group-children { max-height: 0; opacity: 0; }
+.nav-group-children a { font-size: 13px; padding: 4px 10px; }
+
+.sidebar-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--c3); padding: 14px 18px 4px;
+}
+
+/* ---------- content ---------- */
+.content {
+  margin-left: var(--sidebar-w); margin-top: 56px;
+  max-width: 920px; padding: 36px 56px 80px;
+}
+article h1, article h2, article h3, article h4, article h5 {
+  font-weight: 600; color: var(--c1); margin: 32px 0 12px; line-height: 1.35;
+}
+article h1 { font-size: 28px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-top: 0; }
+article h2 { font-size: 22px; padding-bottom: 8px; border-bottom: 1px solid #eaecef; }
+article h3 { font-size: 18px; }
+article h4 { font-size: 15px; }
+article p, article ul, article ol, article blockquote { margin-bottom: 14px; }
+article ul, article ol { padding-left: 24px; }
+article li { margin-bottom: 4px; }
+article code { background: var(--bg-code); padding: 2px 6px; border-radius: 4px;
+                font-size: 13px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+article pre {
+  background: var(--bg-code); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; margin-bottom: 16px;
+  font-size: 13.5px; line-height: 1.55;
+}
+article pre code { background: none; padding: 0; }
+article table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
+article th, article td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+article th { background: var(--bg-code); font-weight: 600; }
+article tr:nth-child(even) { background: #fafbfc; }
+article hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+article blockquote {
+  border-left: 4px solid var(--primary); padding: 6px 16px; color: var(--c2);
+  background: var(--bg-side); border-radius: 0 6px 6px 0;
+}
+
+article .admonition {
+  border-radius: 8px; padding: 12px 18px; margin: 16px 0;
+  border-left: 4px solid var(--note-bd); background: var(--note-bg);
+}
+article .admonition .admonition-title {
+  font-weight: 700; margin: 0 0 4px; font-size: 13px; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--c1);
+}
+article .admonition-warning  { border-left-color: var(--warn-bd); background: var(--warn-bg); }
+article .admonition-caution  { border-left-color: var(--warn-bd); background: var(--warn-bg); }
+article .admonition-tip      { border-left-color: var(--tip-bd);  background: var(--tip-bg); }
+article .admonition-important{ border-left-color: var(--important-bd); background: var(--important-bg); }
+
+article .mermaid { margin: 16px auto; text-align: center; }
+article .toc { background: var(--bg-side); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; margin: 16px 0; }
+article .toc > ul { padding-left: 20px; margin: 0; }
+
+article a.headerlink { margin-left: 6px; opacity: 0; }
+article :hover > a.headerlink { opacity: .5; }
+
+footer.page-footer { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--border);
+                     color: var(--c2); font-size: 13px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+footer.page-footer a { color: var(--c2); }
+footer.page-footer a:hover { color: var(--primary); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px) {
+  .topbar-toggle { display: inline-block; }
+  .topbar-search { display: none; }
+  .sidebar { transform: translateX(-100%); box-shadow: 2px 0 12px rgba(0,0,0,.08); }
+  .sidebar.open { transform: translateX(0); }
+  .content { margin-left: 0; padding: 28px 22px 60px; }
+}
+</style>
+</head>
+<body data-version="shared" data-lang="zh" data-slug="shared/demos/fastapi">
+
+<header class="topbar">
+  <button class="topbar-toggle" aria-label="Toggle navigation" onclick="toggleSidebar()">☰</button>
+  <a class="topbar-brand" href="../../index.html">
+    <img src="../../../assets/logos/minicpmv.png" alt="MiniCPM-V">
+    <span class="brand-text">MiniCPM-V & o Cookbook</span>
+  </a>
+  <div class="topbar-search">
+    <input type="search" placeholder="搜索文档…" id="pagefind-search">
+  </div>
+  <nav class="topbar-actions">
+    <a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/openbmb" target="_blank" rel="noopener">HuggingFace</a>
+    <a href="https://modelscope.cn/organization/OpenBMB" target="_blank" rel="noopener">魔搭社区</a>
+    <a href="https://discord.gg/rftuRMbqzf" target="_blank" rel="noopener">Discord</a>
+    <a href="https://huggingface.co/papers/2509.18154" target="_blank" rel="noopener">技术报告</a>
+  </nav>
+</header>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a class="sidebar-lang-switch" href="../../../en/shared/demos/fastapi.html" rel="alternate" hreflang="en">English</a>
+  </div>
+  <ul class="nav-list">
+  <li><a class="" href="../../index.html">首页</a></li>
+</ul>
+<div class="sidebar-section-title">版本</div>
+<div class="version-switcher">
+  <select id="version-switcher-select">
+    <option value="../../v4.6/overview.html" selected>MiniCPM-V 4.6 [latest]</option>
+    <option value="../../v4.5/overview.html">MiniCPM-V 4.5</option>
+    <option value="../../o4.5/overview.html">MiniCPM-o 4.5</option>
+  </select>
+</div>
+<ul class="nav-list">
+<li><a class="" href="../../v4.6/overview.html">概览</a></li>
+<li class="nav-group"><div class="nav-group-header">推理</div><ul class="nav-group-children"><li><a class="" href="../../v4.6/inference/single-image.html">单图问答</a></li>
+<li><a class="" href="../../v4.6/inference/multi-images.html">多图问答</a></li>
+<li><a class="" href="../../v4.6/inference/video-understanding.html">视频理解</a></li>
+<li><a class="" href="../../v4.6/inference/ocr.html">OCR</a></li>
+<li><a class="" href="../../v4.6/inference/pdf-parse.html">PDF 解析</a></li>
+<li><a class="" href="../../v4.6/inference/grounding.html">视觉定位</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">部署</div><ul class="nav-group-children"><li><a class="" href="../../v4.6/deployment/vllm.html">vLLM</a></li>
+<li><a class="" href="../../v4.6/deployment/sglang.html">SGLang</a></li>
+<li><a class="" href="../../v4.6/deployment/llamacpp.html">llama.cpp</a></li>
+<li><a class="" href="../../v4.6/deployment/ollama.html">Ollama</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">量化</div><ul class="nav-group-children"><li><a class="" href="../../v4.6/quantization/gguf.html">GGUF</a></li>
+<li><a class="" href="../../v4.6/quantization/bnb.html">BNB</a></li>
+<li><a class="" href="../../v4.6/quantization/awq.html">AWQ</a></li></ul></li>
+</ul>
+<div class="sidebar-section-title">跨版本</div>
+<ul class="nav-list">
+<li class="nav-group"><div class="nav-group-header">微调</div><ul class="nav-group-children"><li><a class="" href="../finetune/dataset.html">数据集准备</a></li>
+<li><a class="" href="../finetune/full.html">全参数微调</a></li>
+<li><a class="" href="../finetune/lora.html">LoRA</a></li>
+<li><a class="" href="../finetune/llamafactory.html">LLaMA-Factory</a></li>
+<li><a class="" href="../finetune/swift.html">SWIFT</a></li>
+<li><a class="" href="../finetune/align-anything.html">Align-anything</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">演示</div><ul class="nav-group-children"><li><a class="active" href="fastapi.html">FastAPI 全模态流式</a></li>
+<li><a class="" href="gradio.html">Gradio</a></li>
+<li><a class="" href="ios.html">iOS</a></li></ul></li>
+</ul>
+</aside>
+
+<main class="content" id="content">
+  <article><h1 id="演示应用指南">演示应用指南</h1>
+<p>提供完整的 Web 演示应用，帮助您快速体验和展示 MiniCPM-o 的强大功能。</p>
+<p>📖 <a href="fastapi.html">English Version</a> | <a href="../">返回主页</a></p>
+<h2 id="web-demo">Web Demo</h2>
+<p>我们提供两种类型的 Web 演示应用，适用于不同的使用场景：</p>
+<h3 id="图文演示">📖 图文演示</h3>
+<p><strong>最适合</strong>: 标准多模态交互、文档处理、图像分析</p>
+<p><strong>特点</strong>:</p>
+<ul>
+<li>基于文本和图像的交互</li>
+<li>支持文件上传的多轮对话</li>
+<li>适合研究、教育和基础多模态任务</li>
+<li>支持多种图像格式和文档解析</li>
+</ul>
+<p><strong>可用版本</strong>:</p>
+<ul>
+<li><strong>Gradio</strong>: 简洁易用的 Web 界面，支持快速部署</li>
+<li><strong>OpenWebUI</strong>: 高级 Web 界面，具有增强功能</li>
+</ul>
+<h3 id="全模态流式演示">🎤 全模态流式演示</h3>
+<p><strong>最适合</strong>: 实时语音对话、多模态流式处理、语音交互</p>
+<p><strong>特点</strong>:</p>
+<ul>
+<li>实时语音对话能力</li>
+<li>音视频流处理支持</li>
+<li>语音克隆和情感控制</li>
+<li>多模态同时处理</li>
+<li>流式交互 API 端点</li>
+</ul>
+<h2 id="使用场景">使用场景</h2>
+<h3 id="全模态流式演示_1">全模态流式演示</h3>
+<ul>
+<li><strong>语音助手</strong>: 支持语音交互的对话 AI</li>
+<li><strong>流媒体应用</strong>: 多模态流式交互界面</li>
+<li><strong>客户服务</strong>: 语音客服系统</li>
+<li><strong>娱乐应用</strong>: 语音克隆和互动媒体</li>
+</ul></article>
+
+  <footer class="page-footer">
+    <span>© OpenBMB · <a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook">GitHub 仓库</a></span>
+    <span>由 <code>build_docs.py</code> 自动生成</span>
+  </footer>
+</main>
+
+<script>
+  // ----- core UI behaviour (must run even if external CDNs are blocked) -----
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  document.querySelectorAll('.nav-group-header').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+  });
+
+  // Close sidebar when clicking a link on mobile.
+  document.querySelectorAll('.sidebar a').forEach(a => {
+    a.addEventListener('click', () => {
+      if (window.innerWidth <= 900) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
+    });
+  });
+
+  // Version switcher dropdown.
+  const verSel = document.getElementById('version-switcher-select');
+  if (verSel) {
+    verSel.addEventListener('change', e => {
+      const target = e.target.value;
+      if (target) window.location.href = target;
+    });
+  }
+</script>
+
+<!-- Optional enhancements below. Wrapped so a CDN hiccup never breaks the
+     interactive sidebar / version switcher above. -->
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js" onerror="window.__hljsBlocked=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/common.min.js" onerror="window.__hljsBlocked=true"></script>
+<script>
+  try { if (typeof hljs !== 'undefined') hljs.highlightAll(); } catch (e) { console.warn('hljs failed:', e); }
+</script>
+<script type="module">
+  try {
+    const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+    m.default.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+  } catch (e) { console.warn('mermaid failed:', e); }
+</script>
+<link href="https://cdn.jsdelivr.net/npm/@pagefind/default-ui@1/css/ui.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@pagefind/default-ui@1/npm/index.js"></script>
+<script>
+  // Pagefind is loaded from a relative path emitted at build time.
+  const inp = document.getElementById("pagefind-search");
+  if (inp) {
+    inp.addEventListener("focus", function once() {
+      inp.removeEventListener("focus", once);
+      const root = inp.parentElement;
+      const div = document.createElement("div"); div.id = "search"; root.appendChild(div);
+      new PagefindUI({ element: "#search", showSubResults: true });
+    });
+  }
+</script>
+
+</body>
+</html>

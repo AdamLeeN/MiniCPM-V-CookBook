@@ -6,5 +6,5 @@ This directory contains SGLang deployment guides for different MiniCPM versions.
 
 ## Versioned Deployment Guides
 
-- MiniCPM-V 4.5: [English](./MiniCPM-v4_5_sglang.md) | [中文](./MiniCPM-v4_5_sglang_zh.md)
-- MiniCPM-V 4.0: [English](./MiniCPM-v4_sglang.md) | [中文](./MiniCPM-v4_sglang_zh.md)
+- MiniCPM-V 4.5: [English](./minicpm-v4_5_sglang.md) | [中文](./minicpm-v4_5_sglang_zh.md)
+- MiniCPM-V 4.0: [English](./minicpm-v4_sglang.md) | [中文](./minicpm-v4_sglang_zh.md)

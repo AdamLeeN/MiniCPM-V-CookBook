@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="GPTQ — 视觉 / 语音 / 实时流多模态 AI 的实战手册。">
+<title>GPTQ — MiniCPM-V & o Cookbook</title>
+<link rel="icon" type="image/png" href="../../../assets/logos/openbmb.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
+<style>
+:root {
+  --primary: #3680ff;
+  --accent:  #1AC8DB;
+  --sidebar-w: 280px;
+  --bg: #fff;
+  --bg-side: #fafbfc;
+  --bg-code: #f6f8fa;
+  --c1: #24292f;
+  --c2: #57606a;
+  --c3: #8b949e;
+  --border: #d0d7de;
+  --nav-active-bg: rgba(54, 128, 255, .08);
+  --nav-active-fg: var(--primary);
+  --link: var(--primary);
+  --warn-bg: #fff8c5;
+  --warn-bd: #d4a72c;
+  --note-bg: #ddf4ff;
+  --note-bd: #54aeff;
+  --tip-bg:  #dafbe1;
+  --tip-bd:  #1f883d;
+  --important-bg: #fbefff;
+  --important-bd: #8250df;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+               "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  color: var(--c1);
+  line-height: 1.65;
+  background: var(--bg);
+  font-size: 15px;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 18px;
+}
+.topbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-brand img { height: 30px; }
+.topbar-brand .brand-text { font-weight: 600; font-size: 15px; color: var(--c1); white-space: nowrap; }
+.topbar-search { flex: 1; max-width: 480px; position: relative; }
+.topbar-search input {
+  width: 100%; padding: 8px 12px 8px 34px; font-size: 14px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-side);
+  outline: none; transition: border-color .15s;
+}
+.topbar-search input:focus { border-color: var(--primary); }
+.topbar-search::before {
+  content: "🔍"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; opacity: .5;
+}
+.topbar-actions { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+.topbar-actions a { color: var(--c2); }
+.topbar-actions a:hover { color: var(--primary); }
+.topbar-toggle {
+  display: none; background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 10px; font-size: 16px; cursor: pointer;
+}
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  position: fixed; top: 56px; left: 0; bottom: 0; width: var(--sidebar-w);
+  overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border);
+  padding: 16px 0 32px;
+  transition: transform .25s;
+}
+.sidebar-header { padding: 4px 18px 14px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.sidebar-lang-switch {
+  display: inline-block; font-size: 12px; color: var(--primary);
+  text-decoration: none; padding: 3px 12px;
+  border: 1px solid var(--border); border-radius: 999px;
+  transition: background .15s, border-color .15s;
+}
+.sidebar-lang-switch:hover { background: var(--nav-active-bg); border-color: var(--primary); text-decoration: none; }
+.sidebar-lang-switch::before { content: "🌐 "; opacity: .8; margin-right: 2px; }
+
+.version-switcher { padding: 0 18px 12px; }
+.version-switcher select {
+  width: 100%; padding: 7px 10px; font-size: 14px;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  cursor: pointer; outline: none;
+}
+.version-switcher .badge {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; font-size: 11px;
+  border-radius: 999px; background: var(--accent); color: #fff;
+  vertical-align: middle; font-weight: 600;
+}
+.nav-list { list-style: none; padding: 4px 12px; }
+.nav-list a { display: block; padding: 6px 12px; color: var(--c2); border-radius: 6px;
+              font-size: 14px; transition: background .15s, color .15s; }
+.nav-list a:hover { background: #ebeff3; color: var(--c1); text-decoration: none; }
+.nav-list a.active { background: var(--nav-active-bg); color: var(--nav-active-fg); font-weight: 600; }
+.nav-group { margin-top: 8px; }
+.nav-group-header {
+  padding: 6px 12px; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--c1); cursor: pointer;
+  user-select: none; display: flex; align-items: center; gap: 6px;
+  border-radius: 6px; transition: background .15s;
+}
+.nav-group-header:hover { background: #ebeff3; }
+.nav-group-header::before {
+  content: ""; width: 0; height: 0;
+  border-left: 5px solid var(--c2); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform .2s; transform: rotate(90deg);
+}
+.nav-group.collapsed .nav-group-header::before { transform: rotate(0); }
+.nav-group-children { list-style: none; margin: 2px 0 4px 22px; padding-left: 12px;
+                       border-left: 2px solid #e3e7ed;
+                       max-height: 800px; overflow: hidden;
+                       transition: max-height .25s ease, opacity .2s ease, padding .2s ease;
+                       opacity: 1; }
+.nav-group.collapsed .nav-group-children { max-height: 0; opacity: 0; }
+.nav-group-children a { font-size: 13px; padding: 4px 10px; }
+
+.sidebar-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--c3); padding: 14px 18px 4px;
+}
+
+/* ---------- content ---------- */
+.content {
+  margin-left: var(--sidebar-w); margin-top: 56px;
+  max-width: 920px; padding: 36px 56px 80px;
+}
+article h1, article h2, article h3, article h4, article h5 {
+  font-weight: 600; color: var(--c1); margin: 32px 0 12px; line-height: 1.35;
+}
+article h1 { font-size: 28px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-top: 0; }
+article h2 { font-size: 22px; padding-bottom: 8px; border-bottom: 1px solid #eaecef; }
+article h3 { font-size: 18px; }
+article h4 { font-size: 15px; }
+article p, article ul, article ol, article blockquote { margin-bottom: 14px; }
+article ul, article ol { padding-left: 24px; }
+article li { margin-bottom: 4px; }
+article code { background: var(--bg-code); padding: 2px 6px; border-radius: 4px;
+                font-size: 13px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+article pre {
+  background: var(--bg-code); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; margin-bottom: 16px;
+  font-size: 13.5px; line-height: 1.55;
+}
+article pre code { background: none; padding: 0; }
+article table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
+article th, article td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+article th { background: var(--bg-code); font-weight: 600; }
+article tr:nth-child(even) { background: #fafbfc; }
+article hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+article blockquote {
+  border-left: 4px solid var(--primary); padding: 6px 16px; color: var(--c2);
+  background: var(--bg-side); border-radius: 0 6px 6px 0;
+}
+
+article .admonition {
+  border-radius: 8px; padding: 12px 18px; margin: 16px 0;
+  border-left: 4px solid var(--note-bd); background: var(--note-bg);
+}
+article .admonition .admonition-title {
+  font-weight: 700; margin: 0 0 4px; font-size: 13px; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--c1);
+}
+article .admonition-warning  { border-left-color: var(--warn-bd); background: var(--warn-bg); }
+article .admonition-caution  { border-left-color: var(--warn-bd); background: var(--warn-bg); }
+article .admonition-tip      { border-left-color: var(--tip-bd);  background: var(--tip-bg); }
+article .admonition-important{ border-left-color: var(--important-bd); background: var(--important-bg); }
+
+article .mermaid { margin: 16px auto; text-align: center; }
+article .toc { background: var(--bg-side); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; margin: 16px 0; }
+article .toc > ul { padding-left: 20px; margin: 0; }
+
+article a.headerlink { margin-left: 6px; opacity: 0; }
+article :hover > a.headerlink { opacity: .5; }
+
+footer.page-footer { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--border);
+                     color: var(--c2); font-size: 13px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+footer.page-footer a { color: var(--c2); }
+footer.page-footer a:hover { color: var(--primary); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px) {
+  .topbar-toggle { display: inline-block; }
+  .topbar-search { display: none; }
+  .sidebar { transform: translateX(-100%); box-shadow: 2px 0 12px rgba(0,0,0,.08); }
+  .sidebar.open { transform: translateX(0); }
+  .content { margin-left: 0; padding: 28px 22px 60px; }
+}
+</style>
+</head>
+<body data-version="v4.5" data-lang="zh" data-slug="v4.5/quantization/gptq">
+
+<header class="topbar">
+  <button class="topbar-toggle" aria-label="Toggle navigation" onclick="toggleSidebar()">☰</button>
+  <a class="topbar-brand" href="../../index.html">
+    <img src="../../../assets/logos/minicpmv.png" alt="MiniCPM-V">
+    <span class="brand-text">MiniCPM-V & o Cookbook</span>
+  </a>
+  <div class="topbar-search">
+    <input type="search" placeholder="搜索文档…" id="pagefind-search">
+  </div>
+  <nav class="topbar-actions">
+    <a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/openbmb" target="_blank" rel="noopener">HuggingFace</a>
+    <a href="https://modelscope.cn/organization/OpenBMB" target="_blank" rel="noopener">魔搭社区</a>
+    <a href="https://discord.gg/rftuRMbqzf" target="_blank" rel="noopener">Discord</a>
+    <a href="https://huggingface.co/papers/2509.18154" target="_blank" rel="noopener">技术报告</a>
+  </nav>
+</header>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a class="sidebar-lang-switch" href="../../../en/v4.5/quantization/gptq.html" rel="alternate" hreflang="en">English</a>
+  </div>
+  <ul class="nav-list">
+  <li><a class="" href="../../index.html">首页</a></li>
+</ul>
+<div class="sidebar-section-title">版本</div>
+<div class="version-switcher">
+  <select id="version-switcher-select">
+    <option value="../../v4.6/quantization/gptq.html">MiniCPM-V 4.6 [latest]</option>
+    <option value="gptq.html" selected>MiniCPM-V 4.5</option>
+    <option value="../../o4.5/quantization/gptq.html">MiniCPM-o 4.5</option>
+  </select>
+</div>
+<ul class="nav-list">
+<li><a class="" href="../overview.html">概览</a></li>
+<li class="nav-group"><div class="nav-group-header">推理</div><ul class="nav-group-children"><li><a class="" href="../inference/single-image.html">单图问答</a></li>
+<li><a class="" href="../inference/multi-images.html">多图问答</a></li>
+<li><a class="" href="../inference/video-understanding.html">视频理解</a></li>
+<li><a class="" href="../inference/ocr.html">OCR</a></li>
+<li><a class="" href="../inference/pdf-parse.html">PDF 解析</a></li>
+<li><a class="" href="../inference/grounding.html">视觉定位</a></li>
+<li><a class="" href="../inference/multi-images-think.html">多图（思考模式）</a></li>
+<li><a class="" href="../inference/single-image-think.html">单图（思考模式）</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">部署</div><ul class="nav-group-children"><li><a class="" href="../deployment/vllm.html">vLLM</a></li>
+<li><a class="" href="../deployment/sglang.html">SGLang</a></li>
+<li><a class="" href="../deployment/llamacpp.html">llama.cpp</a></li>
+<li><a class="" href="../deployment/ollama.html">Ollama</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">量化</div><ul class="nav-group-children"><li><a class="" href="gguf.html">GGUF</a></li>
+<li><a class="" href="bnb.html">BNB</a></li>
+<li><a class="" href="awq.html">AWQ</a></li>
+<li><a class="active" href="gptq.html">GPTQ</a></li></ul></li>
+</ul>
+<div class="sidebar-section-title">跨版本</div>
+<ul class="nav-list">
+<li class="nav-group"><div class="nav-group-header">微调</div><ul class="nav-group-children"><li><a class="" href="../../shared/finetune/dataset.html">数据集准备</a></li>
+<li><a class="" href="../../shared/finetune/full.html">全参数微调</a></li>
+<li><a class="" href="../../shared/finetune/lora.html">LoRA</a></li>
+<li><a class="" href="../../shared/finetune/llamafactory.html">LLaMA-Factory</a></li>
+<li><a class="" href="../../shared/finetune/swift.html">SWIFT</a></li>
+<li><a class="" href="../../shared/finetune/align-anything.html">Align-anything</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">演示</div><ul class="nav-group-children"><li><a class="" href="../../shared/demos/fastapi.html">FastAPI 全模态流式</a></li>
+<li><a class="" href="../../shared/demos/gradio.html">Gradio</a></li>
+<li><a class="" href="../../shared/demos/ios.html">iOS</a></li></ul></li>
+</ul>
+</aside>
+
+<main class="content" id="content">
+  <article><h1 id="gptq">GPTQ</h1>
+<p>::::{Note}
+<strong>支持版本：</strong> MiniCPM-V 4.5
+::::</p>
+<h2 id="方法-1-用预量化模型">方法 1（用预量化模型）</h2>
+<h3 id="1-下载模型">1. 下载模型</h3>
+<p>从下面任一来源获取 4-bit GPTQ 量化的 MiniCPM-V-4_5：</p>
+<ul>
+<li><strong>HuggingFace</strong> — <a href="https://huggingface.co/openbmb/MiniCPM-V-4_5-GPTQ">https://huggingface.co/openbmb/MiniCPM-V-4_5-GPTQ</a></li>
+<li><strong>ModelScope</strong> — <a href="https://modelscope.cn/models/OpenBMB/MiniCPM-V-4_5-GPTQ">https://modelscope.cn/models/OpenBMB/MiniCPM-V-4_5-GPTQ</a></li>
+</ul>
+<div class="code"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://huggingface.co/openbmb/MiniCPM-V-4_5-GPTQ
+</code></pre></div>
+
+<h3 id="2-用-vllm-运行">2. 用 vLLM 运行</h3>
+<div class="code"><pre><span></span><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoTokenizer</span>
+<span class="kn">from</span> <span class="nn">vllm</span> <span class="kn">import</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">SamplingParams</span>
+
+
+<span class="c1"># 量化模型名称或本地路径</span>
+<span class="n">MODEL_NAME</span> <span class="o">=</span> <span class="s2">&quot;openbmb/MiniCPM-V-4_5-GPTQ&quot;</span>
+
+<span class="c1"># 图片文件列表</span>
+<span class="n">IMAGES</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;image.png&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="c1"># 加载并转换图片</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">IMAGES</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span>
+
+<span class="c1"># 初始化 tokenizer</span>
+<span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">MODEL_NAME</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># 初始化 LLM</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">MODEL_NAME</span><span class="p">,</span> 
+    <span class="c1"># gpu_memory_utilization=0.9,</span>
+    <span class="n">max_model_len</span><span class="o">=</span><span class="mi">2048</span><span class="p">,</span>
+    <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="c1"># disable_mm_preprocessor_cache=True,</span>
+    <span class="c1"># limit_mm_per_prompt={&quot;image&quot;: 5}</span>
+<span class="p">)</span>
+
+<span class="c1"># 构建消息</span>
+<span class="n">messages</span> <span class="o">=</span> <span class="p">[{</span>
+    <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;(&lt;image&gt;./&lt;/image&gt;)</span><span class="se">\n</span><span class="s2">请描述这张图片的内容&quot;</span><span class="p">,</span>
+    <span class="c1"># &quot;content&quot;: &quot;(&lt;image&gt;./&lt;/image&gt;)\nPlease describe the content of this image&quot;,</span>
+<span class="p">}]</span>
+
+<span class="c1"># 应用 chat template</span>
+<span class="n">prompt</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">apply_chat_template</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span> <span class="n">tokenize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">add_generation_prompt</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># 设置 stop token IDs</span>
+<span class="n">stop_tokens</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&lt;|im_end|&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;/s&gt;&#39;</span><span class="p">]</span>
+<span class="n">stop_token_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">convert_tokens_to_ids</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">stop_tokens</span><span class="p">]</span>
+
+<span class="c1"># 采样参数</span>
+<span class="n">sampling_params</span> <span class="o">=</span> <span class="n">SamplingParams</span><span class="p">(</span>
+    <span class="n">stop_token_ids</span><span class="o">=</span><span class="n">stop_token_ids</span><span class="p">,</span>
+    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>
+    <span class="n">top_p</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+    <span class="n">max_tokens</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># 推理</span>
+<span class="n">outputs</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">({</span>
+    <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="n">prompt</span><span class="p">,</span>
+    <span class="s2">&quot;multi_modal_data&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;image&quot;</span><span class="p">:</span> <span class="n">image</span>
+    <span class="p">}</span>
+<span class="p">},</span> <span class="n">sampling_params</span><span class="o">=</span><span class="n">sampling_params</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+</code></pre></div>
+
+<h2 id="方法-2-自己进行-gptq-量化">方法 2（自己进行 GPTQ 量化）</h2>
+<h3 id="1-下载模型_1">1. 下载模型</h3>
+<!-- 下载模型
+https://huggingface.co/openbmb/MiniCPM-V-4_5
+ -->
+
+<p>从 <a href="https://huggingface.co/openbmb/MiniCPM-V-4_5">HuggingFace</a> 下载 MiniCPM-V 4.5 模型。</p>
+<div class="code"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://huggingface.co/openbmb/MiniCPM-V-4_5
+</code></pre></div>
+
+<h3 id="2-安装-autogptq-并为-qwen3-minicpm-v-4_5-打补丁">2. 安装 AutoGPTQ 并为 Qwen3 (MiniCPM-V-4_5) 打补丁</h3>
+<p>clone 一份 AutoGPTQ 源码（如 <code>https://github.com/AutoGPTQ/AutoGPTQ</code>），按下方修改后从源码安装。本 cookbook 的脚本会把 <code>llm.config.model_type</code> 设为 <code>"qwen3"</code> 并使用 <code>Qwen3GPTQForCausalLM</code>；Qwen3 的 layer 可能直接返回 hidden state tensor 而不是 tuple，所以 <code>_base.py</code> 也需要兼容这两种情况。</p>
+<p>需要修改 AutoGPTQ 仓库中的以下路径：</p>
+<table>
+<thead>
+<tr>
+<th>修改</th>
+<th>文件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新增文件</td>
+<td><code>auto_gptq/modeling/qwen3.py</code></td>
+</tr>
+<tr>
+<td>注册类 + <code>model_type</code></td>
+<td><code>auto_gptq/modeling/auto.py</code></td>
+</tr>
+<tr>
+<td>导出</td>
+<td><code>auto_gptq/modeling/__init__.py</code></td>
+</tr>
+<tr>
+<td>让校验通过 <code>model_type == "qwen3"</code></td>
+<td><code>auto_gptq/modeling/_const.py</code></td>
+</tr>
+<tr>
+<td>兼容 layer forward 返回值</td>
+<td><code>auto_gptq/modeling/_base.py</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="2-1-新增-auto_gptq-modeling-qwen3-py">2.1 新增 <code>auto_gptq/modeling/qwen3.py</code></h4>
+<div class="code"><pre><span></span><code><span class="kn">from</span> <span class="nn">._base</span> <span class="kn">import</span> <span class="n">BaseGPTQForCausalLM</span>
+
+
+<span class="k">class</span> <span class="nc">Qwen3GPTQForCausalLM</span><span class="p">(</span><span class="n">BaseGPTQForCausalLM</span><span class="p">):</span>
+    <span class="n">layer_type</span> <span class="o">=</span> <span class="s2">&quot;Qwen3DecoderLayer&quot;</span>
+    <span class="n">layers_block_name</span> <span class="o">=</span> <span class="s2">&quot;model.layers&quot;</span>
+    <span class="n">outside_layer_modules</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;model.embed_tokens&quot;</span><span class="p">,</span> <span class="s2">&quot;model.norm&quot;</span><span class="p">]</span>
+    <span class="n">inside_layer_modules</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">[</span><span class="s2">&quot;self_attn.q_proj&quot;</span><span class="p">,</span> <span class="s2">&quot;self_attn.k_proj&quot;</span><span class="p">,</span> <span class="s2">&quot;self_attn.v_proj&quot;</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;self_attn.o_proj&quot;</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;mlp.gate_proj&quot;</span><span class="p">,</span> <span class="s2">&quot;mlp.up_proj&quot;</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;mlp.down_proj&quot;</span><span class="p">],</span>
+    <span class="p">]</span>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Qwen3GPTQForCausalLM&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h4 id="2-2-修改-auto_gptq-modeling-auto-py">2.2 修改 <code>auto_gptq/modeling/auto.py</code></h4>
+<p>在文件顶部其它 <code>from .xxx import ...</code> 行旁加上：</p>
+<div class="code"><pre><span></span><code><span class="kn">from</span> <span class="nn">.qwen3</span> <span class="kn">import</span> <span class="n">Qwen3GPTQForCausalLM</span>
+</code></pre></div>
+
+<p>并在 <code>GPTQ_CAUSAL_LM_MODEL_MAP</code> 中加：</p>
+<div class="code"><pre><span></span><code>    <span class="s2">&quot;qwen3&quot;</span><span class="p">:</span> <span class="n">Qwen3GPTQForCausalLM</span><span class="p">,</span>
+</code></pre></div>
+
+<h4 id="2-3-修改-auto_gptq-modeling-__init__-py">2.3 修改 <code>auto_gptq/modeling/__init__.py</code></h4>
+<p>在其它 modeling 导入旁追加：</p>
+<div class="code"><pre><span></span><code><span class="kn">from</span> <span class="nn">.qwen3</span> <span class="kn">import</span> <span class="n">Qwen3GPTQForCausalLM</span>
+</code></pre></div>
+
+<h4 id="2-4-修改-auto_gptq-modeling-_const-py">2.4 修改 <code>auto_gptq/modeling/_const.py</code></h4>
+<p>在 <code>SUPPORTED_MODELS</code> 列表中追加字符串 <code>"qwen3"</code>（注意保持有效的 Python 列表语法，例如前一项加逗号）。</p>
+<h4 id="2-5-修改-auto_gptq-modeling-_base-py">2.5 修改 <code>auto_gptq/modeling/_base.py</code></h4>
+<p>在 <code>BaseGPTQForCausalLM.quantize</code> 中找到调用 <code>layer(*layer_input, **additional_layer_inputs)</code> 并把结果传给 <code>move_to_device</code> 的内层循环。把原来直接 <code>[0]</code> 取值的写法替换为既能处理 tuple/list（取第一个元素）也能直接处理 tensor 的逻辑：</p>
+<div class="code"><pre><span></span><code>                <span class="n">raw_output</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="o">*</span><span class="n">layer_input</span><span class="p">,</span> <span class="o">**</span><span class="n">additional_layer_inputs</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw_output</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">)):</span>
+                    <span class="n">raw_output</span> <span class="o">=</span> <span class="n">raw_output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">layer_output</span> <span class="o">=</span> <span class="n">move_to_device</span><span class="p">(</span>
+                    <span class="n">raw_output</span><span class="p">,</span>
+                    <span class="n">cur_layer_device</span> <span class="k">if</span> <span class="n">cache_examples_on_gpu</span> <span class="k">else</span> <span class="n">CPU</span><span class="p">,</span>
+                <span class="p">)</span>
+</code></pre></div>
+
+<p>（删除原来假设 <code>layer(...)[0]</code> 一定存在的写法。）</p>
+<h4 id="2-6-从源码安装">2.6 从源码安装</h4>
+<div class="code"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>AutoGPTQ
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</code></pre></div>
+
+<p>如果扩展构建失败，按 AutoGPTQ README 安装对应 CUDA / PyTorch 版本依赖。</p>
+<h3 id="3-量化脚本">3. 量化脚本</h3>
+<p>下方脚本会从 MiniCPM-V-4_5 中提取 LLM backbone（Qwen3），用 GPTQ 量化为 4-bit，再把量化后的权重与原始多模态部分重新组装。</p>
+<p>执行下方脚本（按需替换 <code>MODEL_PATH</code> 与 <code>OUTPUT_PATH</code>）：</p>
+<div class="code"><pre><span></span><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">datasets</span> <span class="kn">import</span> <span class="n">load_dataset</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoModel</span><span class="p">,</span> <span class="n">AutoTokenizer</span><span class="p">,</span> <span class="n">AutoConfig</span>
+
+
+<span class="k">def</span> <span class="nf">_ensure_hf_dynamic_module_cache</span><span class="p">(</span><span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;提前复制所有 .py 文件，确保间接相对导入能解析。&quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">transformers.dynamic_module_utils</span> <span class="kn">import</span> <span class="p">(</span>
+        <span class="n">HF_MODULES_CACHE</span><span class="p">,</span>
+        <span class="n">TRANSFORMERS_DYNAMIC_MODULE_NAME</span><span class="p">,</span>
+        <span class="n">_sanitize_module_name</span><span class="p">,</span>
+        <span class="n">init_hf_modules</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">init_hf_modules</span><span class="p">()</span>
+    <span class="n">submodule</span> <span class="o">=</span> <span class="n">_sanitize_module_name</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">HF_MODULES_CACHE</span><span class="p">)</span> <span class="o">/</span> <span class="n">TRANSFORMERS_DYNAMIC_MODULE_NAME</span> <span class="o">/</span> <span class="n">submodule</span>
+    <span class="n">cache_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">py</span> <span class="ow">in</span> <span class="n">Path</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.py&quot;</span><span class="p">):</span>
+        <span class="n">dst</span> <span class="o">=</span> <span class="n">cache_dir</span> <span class="o">/</span> <span class="n">py</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">dst</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">py</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">dst</span><span class="p">))</span>
+
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> </span><span class="si">%(levelname)s</span><span class="s2"> [</span><span class="si">%(name)s</span><span class="s2">] </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span>
+    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+    <span class="n">datefmt</span><span class="o">=</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">MODEL_PATH</span> <span class="o">=</span> <span class="s1">&#39;/model/MiniCPM-V-4_5&#39;</span>
+<span class="n">OUTPUT_PATH</span> <span class="o">=</span> <span class="s1">&#39;./model/MiniCPM-V-4_5-gptq-int4&#39;</span>
+
+<span class="n">BITS</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">GROUP_SIZE</span> <span class="o">=</span> <span class="mi">128</span>
+<span class="n">NUM_CALIBRATION_SAMPLES</span> <span class="o">=</span> <span class="mi">128</span>
+<span class="n">MAX_SEQ_LEN</span> <span class="o">=</span> <span class="mi">512</span>
+
+
+<span class="k">def</span> <span class="nf">prepare_calibration_data</span><span class="p">(</span><span class="n">tokenizer</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">,</span> <span class="n">max_length</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;从 Alpaca 数据集准备校准数据。&quot;&quot;&quot;</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s2">&quot;tatsu-lab/alpaca&quot;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s2">&quot;train&quot;</span><span class="p">)</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">))))</span>
+
+    <span class="n">examples</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">dataset</span><span class="p">:</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">sample</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;text&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">sample</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">sample</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;instruction&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">tokenized</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">(</span>
+            <span class="n">text</span><span class="p">,</span>
+            <span class="n">truncation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="o">=</span><span class="n">max_length</span><span class="p">,</span>
+            <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">examples</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;input_ids&quot;</span><span class="p">:</span> <span class="n">tokenized</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;attention_mask&quot;</span><span class="p">:</span> <span class="n">tokenized</span><span class="p">[</span><span class="s2">&quot;attention_mask&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+        <span class="p">})</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prepared </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">examples</span><span class="p">)</span><span class="si">}</span><span class="s2"> calibration samples&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">examples</span>
+
+
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading tokenizer from </span><span class="si">{</span><span class="n">MODEL_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">MODEL_PATH</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Preparing calibration data...&quot;</span><span class="p">)</span>
+    <span class="n">examples</span> <span class="o">=</span> <span class="n">prepare_calibration_data</span><span class="p">(</span><span class="n">tokenizer</span><span class="p">,</span> <span class="n">NUM_CALIBRATION_SAMPLES</span><span class="p">,</span> <span class="n">MAX_SEQ_LEN</span><span class="p">)</span>
+
+    <span class="n">_ensure_hf_dynamic_module_cache</span><span class="p">(</span><span class="n">MODEL_PATH</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading full MiniCPM-V model from </span><span class="si">{</span><span class="n">MODEL_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">full_model</span> <span class="o">=</span> <span class="n">AutoModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+        <span class="n">MODEL_PATH</span><span class="p">,</span>
+        <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
+        <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">llm</span> <span class="o">=</span> <span class="n">full_model</span><span class="o">.</span><span class="n">llm</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracted LLM backbone: </span><span class="si">{</span><span class="n">llm</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">original_model_type</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">model_type</span>
+    <span class="n">llm</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">model_type</span> <span class="o">=</span> <span class="s2">&quot;qwen3&quot;</span>
+
+    <span class="kn">from</span> <span class="nn">auto_gptq</span> <span class="kn">import</span> <span class="n">BaseQuantizeConfig</span>
+    <span class="kn">from</span> <span class="nn">auto_gptq.modeling.qwen3</span> <span class="kn">import</span> <span class="n">Qwen3GPTQForCausalLM</span>
+
+    <span class="n">quantize_config</span> <span class="o">=</span> <span class="n">BaseQuantizeConfig</span><span class="p">(</span>
+        <span class="n">bits</span><span class="o">=</span><span class="n">BITS</span><span class="p">,</span>
+        <span class="n">group_size</span><span class="o">=</span><span class="n">GROUP_SIZE</span><span class="p">,</span>
+        <span class="n">desc_act</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">sym</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Quantize config: bits=</span><span class="si">{</span><span class="n">BITS</span><span class="si">}</span><span class="s2">, group_size=</span><span class="si">{</span><span class="n">GROUP_SIZE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">llm</span><span class="o">.</span><span class="n">seqlen</span> <span class="o">=</span> <span class="n">MAX_SEQ_LEN</span>
+    <span class="n">gptq_model</span> <span class="o">=</span> <span class="n">Qwen3GPTQForCausalLM</span><span class="p">(</span><span class="n">llm</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">quantize_config</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting GPTQ quantization...&quot;</span><span class="p">)</span>
+    <span class="n">gptq_model</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">examples</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Quantization complete!&quot;</span><span class="p">)</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">llm_temp_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="s2">&quot;_llm_temp&quot;</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">llm_temp_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">gptq_model</span><span class="o">.</span><span class="n">save_quantized</span><span class="p">(</span><span class="n">llm_temp_dir</span><span class="p">,</span> <span class="n">use_safetensors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># 把原始模型中的非权重文件复制过来</span>
+    <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">MODEL_PATH</span><span class="p">):</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">MODEL_PATH</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+        <span class="n">dst</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">fname</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fname</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.safetensors&quot;</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">fname</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;config.json&quot;</span><span class="p">,</span> <span class="s2">&quot;quantize_config.json&quot;</span><span class="p">,</span> <span class="s2">&quot;model.safetensors.index.json&quot;</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">src</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dst</span><span class="p">):</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dst</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">src</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dst</span><span class="p">):</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copytree</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dst</span><span class="p">)</span>
+
+    <span class="c1"># 把量化后的 LLM 权重和原始多模态权重组合</span>
+    <span class="kn">from</span> <span class="nn">safetensors.torch</span> <span class="kn">import</span> <span class="n">load_file</span> <span class="k">as</span> <span class="n">safe_load</span><span class="p">,</span> <span class="n">save_file</span> <span class="k">as</span> <span class="n">safe_save</span>
+
+    <span class="n">quantized_llm_files</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">llm_temp_dir</span><span class="p">)</span> <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.safetensors&quot;</span><span class="p">)]</span>
+    <span class="n">llm_state_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">quantized_llm_files</span><span class="p">:</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">safe_load</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">llm_temp_dir</span><span class="p">,</span> <span class="n">f</span><span class="p">))</span>
+        <span class="n">llm_state_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span>
+
+    <span class="n">non_llm_state_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">full_model_sd</span> <span class="o">=</span> <span class="n">full_model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">full_model_sd</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;llm.&quot;</span><span class="p">):</span>
+            <span class="n">non_llm_state_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="n">combined_sd</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">llm_state_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">combined_sd</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;llm.</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">non_llm_state_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">combined_sd</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="n">MAX_SHARD_SIZE_BYTES</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>  <span class="c1"># 每分片 4GB</span>
+    <span class="n">sorted_keys</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">combined_sd</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+    <span class="n">shards</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">current_shard</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">current_size</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">weight_map</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">sorted_keys</span><span class="p">:</span>
+        <span class="n">tensor</span> <span class="o">=</span> <span class="n">combined_sd</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="n">tensor_size</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">nelement</span><span class="p">()</span> <span class="o">*</span> <span class="n">tensor</span><span class="o">.</span><span class="n">element_size</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">current_size</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">current_size</span> <span class="o">+</span> <span class="n">tensor_size</span> <span class="o">&gt;</span> <span class="n">MAX_SHARD_SIZE_BYTES</span><span class="p">:</span>
+            <span class="n">shards</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current_shard</span><span class="p">)</span>
+            <span class="n">current_shard</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">current_size</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">current_shard</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="n">current_size</span> <span class="o">+=</span> <span class="n">tensor_size</span>
+
+    <span class="k">if</span> <span class="n">current_shard</span><span class="p">:</span>
+        <span class="n">shards</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current_shard</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shards</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">shard_name</span> <span class="o">=</span> <span class="s2">&quot;model.safetensors&quot;</span>
+        <span class="n">safe_save</span><span class="p">(</span><span class="n">shards</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="n">shard_name</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">shards</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">weight_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">shard_name</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">shard</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">shards</span><span class="p">):</span>
+            <span class="n">shard_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;model-</span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">:</span><span class="s2">05d</span><span class="si">}</span><span class="s2">-of-</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shards</span><span class="p">)</span><span class="si">:</span><span class="s2">05d</span><span class="si">}</span><span class="s2">.safetensors&quot;</span>
+            <span class="n">safe_save</span><span class="p">(</span><span class="n">shard</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="n">shard_name</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">shard</span><span class="p">:</span>
+                <span class="n">weight_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">shard_name</span>
+
+    <span class="n">index</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;total_size&quot;</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">nelement</span><span class="p">()</span> <span class="o">*</span> <span class="n">t</span><span class="o">.</span><span class="n">element_size</span><span class="p">()</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">combined_sd</span><span class="o">.</span><span class="n">values</span><span class="p">())},</span>
+        <span class="s2">&quot;weight_map&quot;</span><span class="p">:</span> <span class="n">weight_map</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="s2">&quot;model.safetensors.index.json&quot;</span><span class="p">),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># 保存带量化信息的 config</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">AutoConfig</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">MODEL_PATH</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">config_dict</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+    <span class="n">config_dict</span><span class="p">[</span><span class="s2">&quot;quantization_config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;bits&quot;</span><span class="p">:</span> <span class="n">BITS</span><span class="p">,</span>
+        <span class="s2">&quot;group_size&quot;</span><span class="p">:</span> <span class="n">GROUP_SIZE</span><span class="p">,</span>
+        <span class="s2">&quot;damp_percent&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span>
+        <span class="s2">&quot;desc_act&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;static_groups&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;sym&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;true_sequential&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;quant_method&quot;</span><span class="p">:</span> <span class="s2">&quot;gptq&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;checkpoint_format&quot;</span><span class="p">:</span> <span class="s2">&quot;gptq&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;model_name_or_path&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;model_file_base_name&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">config_dict</span><span class="p">[</span><span class="s2">&quot;model_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">original_model_type</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="s2">&quot;config.json&quot;</span><span class="p">),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">config_dict</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">quant_config_dict</span> <span class="o">=</span> <span class="n">quantize_config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="s2">&quot;quantize_config.json&quot;</span><span class="p">),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">quant_config_dict</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">llm_temp_dir</span><span class="p">)</span>
+
+    <span class="k">del</span> <span class="n">combined_sd</span><span class="p">,</span> <span class="n">llm_state_dict</span><span class="p">,</span> <span class="n">non_llm_state_dict</span><span class="p">,</span> <span class="n">full_model_sd</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Done! Quantized model saved to: </span><span class="si">{</span><span class="n">OUTPUT_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Quantization: W</span><span class="si">{</span><span class="n">BITS</span><span class="si">}</span><span class="s2">A16 GPTQ (weight-only </span><span class="si">{</span><span class="n">BITS</span><span class="si">}</span><span class="s2">-bit, activation fp16)&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compatible with: transformers (via optimum) and vLLM&quot;</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</code></pre></div></article>
+
+  <footer class="page-footer">
+    <span>© OpenBMB · <a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook">GitHub 仓库</a></span>
+    <span>由 <code>build_docs.py</code> 自动生成</span>
+  </footer>
+</main>
+
+<script>
+  // ----- core UI behaviour (must run even if external CDNs are blocked) -----
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  document.querySelectorAll('.nav-group-header').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+  });
+
+  // Close sidebar when clicking a link on mobile.
+  document.querySelectorAll('.sidebar a').forEach(a => {
+    a.addEventListener('click', () => {
+      if (window.innerWidth <= 900) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
+    });
+  });
+
+  // Version switcher dropdown.
+  const verSel = document.getElementById('version-switcher-select');
+  if (verSel) {
+    verSel.addEventListener('change', e => {
+      const target = e.target.value;
+      if (target) window.location.href = target;
+    });
+  }
+</script>
+
+<!-- Optional enhancements below. Wrapped so a CDN hiccup never breaks the
+     interactive sidebar / version switcher above. -->
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js" onerror="window.__hljsBlocked=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/common.min.js" onerror="window.__hljsBlocked=true"></script>
+<script>
+  try { if (typeof hljs !== 'undefined') hljs.highlightAll(); } catch (e) { console.warn('hljs failed:', e); }
+</script>
+<script type="module">
+  try {
+    const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+    m.default.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+  } catch (e) { console.warn('mermaid failed:', e); }
+</script>
+<link href="https://cdn.jsdelivr.net/npm/@pagefind/default-ui@1/css/ui.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@pagefind/default-ui@1/npm/index.js"></script>
+<script>
+  // Pagefind is loaded from a relative path emitted at build time.
+  const inp = document.getElementById("pagefind-search");
+  if (inp) {
+    inp.addEventListener("focus", function once() {
+      inp.removeEventListener("focus", once);
+      const root = inp.parentElement;
+      const div = document.createElement("div"); div.id = "search"; root.appendChild(div);
+      new PagefindUI({ element: "#search", showSubResults: true });
+    });
+  }
+</script>
+
+</body>
+</html>

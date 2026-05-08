@@ -1,0 +1,240 @@
+# MiniCPM-V & o Cookbook — site navigation
+#
+# Consumed by docs/build_docs.py to produce docs/site/{en,zh}.
+#
+# Each entry can have:
+#   title:    {en, zh}  — display name in the sidebar
+#   src:      relative path to the English markdown source (from repo root).
+#             Chinese auto-detected as the same path with `_zh.md` suffix
+#             (or override with `src_zh`).
+#   url:      slug under the version root, e.g. "deployment/vllm"
+#             produces /<version>/deployment/vllm.html
+#
+# Groups are simple labelled containers; they only affect the sidebar grouping.
+
+site:
+  title:
+    en: "MiniCPM-V & o Cookbook"
+    zh: "MiniCPM-V & o Cookbook"
+  tagline:
+    en: "Recipes for vision, speech, and live-streaming multimodal AI."
+    zh: "视觉 / 语音 / 实时流多模态 AI 的实战手册。"
+  repo: "https://github.com/OpenSQZ/MiniCPM-V-CookBook"
+  base_url: "/MiniCPM-V-CookBook"
+  default_version: v4.6
+  default_lang: en
+  brand:
+    primary: "#3680ff"        # MiniCPM blue
+    accent:  "#1AC8DB"        # OpenBMB cyan
+  links:
+    - { label: { en: "GitHub",      zh: "GitHub" },     url: "https://github.com/OpenSQZ/MiniCPM-V-CookBook" }
+    - { label: { en: "HuggingFace", zh: "HuggingFace" }, url: "https://huggingface.co/openbmb" }
+    - { label: { en: "ModelScope",  zh: "魔搭社区" },     url: "https://modelscope.cn/organization/OpenBMB" }
+    - { label: { en: "Discord",     zh: "Discord" },    url: "https://discord.gg/rftuRMbqzf" }
+    - { label: { en: "Paper",       zh: "技术报告" },     url: "https://huggingface.co/papers/2509.18154" }
+
+# Top-level pages (no version prefix). Accessible from all version sidebars.
+top_level:
+  - title: { en: "Home",                 zh: "首页"        }
+    src:    docs/pages/index.md
+    url:    index
+
+versions:
+  - id: v4.6
+    label: { en: "MiniCPM-V 4.6",  zh: "MiniCPM-V 4.6" }
+    badge: "latest"
+    nav:
+      - title: { en: "Overview", zh: "概览" }
+        src:   docs/pages/v4.6/overview.md
+        url:   overview
+
+      - group: { en: "Inference", zh: "推理" }
+        items:
+          - title: { en: "Single-image QA",   zh: "单图问答"    }
+            src:   inference/minicpm-v4_6_single_image.md
+            url:   inference/single-image
+          - title: { en: "Multi-image QA",    zh: "多图问答"    }
+            src:   inference/minicpm-v4_6_multi_images.md
+            url:   inference/multi-images
+          - title: { en: "Video QA",          zh: "视频理解"    }
+            src:   inference/minicpm-v4_6_video_understanding.md
+            url:   inference/video-understanding
+          - title: { en: "OCR",               zh: "OCR"         }
+            src:   inference/minicpm-v4_6_ocr.md
+            url:   inference/ocr
+          - title: { en: "PDF parsing",       zh: "PDF 解析"   }
+            src:   inference/minicpm-v4_6_pdf_parse.md
+            url:   inference/pdf-parse
+          - title: { en: "Visual grounding",  zh: "视觉定位"    }
+            src:   inference/minicpm-v4_6_grounding.md
+            url:   inference/grounding
+
+      - group: { en: "Deployment", zh: "部署" }
+        items:
+          - title: { en: "vLLM",      zh: "vLLM"      }
+            src:   deployment/vllm/minicpm-v4_6_vllm.md
+            url:   deployment/vllm
+          - title: { en: "SGLang",    zh: "SGLang"    }
+            src:   deployment/sglang/minicpm-v4_6_sglang.md
+            url:   deployment/sglang
+          - title: { en: "llama.cpp", zh: "llama.cpp" }
+            src:   deployment/llama.cpp/minicpm-v4_6_llamacpp.md
+            url:   deployment/llamacpp
+          - title: { en: "Ollama",    zh: "Ollama"    }
+            src:   deployment/ollama/minicpm-v4_6_ollama.md
+            url:   deployment/ollama
+
+      - group: { en: "Quantization", zh: "量化" }
+        items:
+          - title: { en: "GGUF", zh: "GGUF" }
+            src:   quantization/gguf/minicpm-v4_6_gguf_quantize.md
+            url:   quantization/gguf
+          - title: { en: "BNB",  zh: "BNB"  }
+            src:   quantization/bnb/minicpm-v4_6_bnb_quantize.md
+            url:   quantization/bnb
+          - title: { en: "AWQ",  zh: "AWQ"  }
+            src:   quantization/awq/minicpm-v4_6_awq_quantize.md
+            url:   quantization/awq
+
+  - id: v4.5
+    label: { en: "MiniCPM-V 4.5",  zh: "MiniCPM-V 4.5" }
+    nav:
+      - title: { en: "Overview", zh: "概览" }
+        src:   docs/pages/v4.5/overview.md
+        url:   overview
+
+      - group: { en: "Inference", zh: "推理" }
+        items:
+          - title: { en: "Single-image QA", zh: "单图问答" }
+            src:   inference/minicpm-v4_5_single_image.md
+            url:   inference/single-image
+          - title: { en: "Multi-image QA",  zh: "多图问答" }
+            src:   inference/minicpm-v4_5_multi_images.md
+            url:   inference/multi-images
+          - title: { en: "Video QA",        zh: "视频理解" }
+            src:   inference/minicpm-v4_5_video_understanding.md
+            url:   inference/video-understanding
+          - title: { en: "OCR",             zh: "OCR" }
+            src:   inference/minicpm-v4_5_ocr.md
+            url:   inference/ocr
+          - title: { en: "PDF parsing",     zh: "PDF 解析" }
+            src:   inference/minicpm-v4_5_pdf_parse.md
+            url:   inference/pdf-parse
+          - title: { en: "Visual grounding", zh: "视觉定位" }
+            src:   inference/minicpm-v4_5_grounding.md
+            url:   inference/grounding
+          - title: { en: "Multi-image (think)", zh: "多图（思考模式）" }
+            src:   inference/minicpm-v4_5_multi_images_think.md
+            url:   inference/multi-images-think
+          - title: { en: "Single-image (think)", zh: "单图（思考模式）" }
+            src:   inference/minicpm-v4_5_single_image_think.md
+            url:   inference/single-image-think
+
+      - group: { en: "Deployment", zh: "部署" }
+        items:
+          - title: { en: "vLLM",      zh: "vLLM"      }
+            src:   deployment/vllm/minicpm-v4_5_vllm.md
+            url:   deployment/vllm
+          - title: { en: "SGLang",    zh: "SGLang"    }
+            src:   deployment/sglang/minicpm-v4_5_sglang.md
+            url:   deployment/sglang
+          - title: { en: "llama.cpp", zh: "llama.cpp" }
+            src:   deployment/llama.cpp/minicpm-v4_5_llamacpp.md
+            url:   deployment/llamacpp
+          - title: { en: "Ollama",    zh: "Ollama"    }
+            src:   deployment/ollama/minicpm-v4_5_ollama.md
+            url:   deployment/ollama
+
+      - group: { en: "Quantization", zh: "量化" }
+        items:
+          - title: { en: "GGUF", zh: "GGUF" }
+            src:   quantization/gguf/minicpm-v4_5_gguf_quantize.md
+            url:   quantization/gguf
+          - title: { en: "BNB",  zh: "BNB"  }
+            src:   quantization/bnb/minicpm-v4_5_bnb_quantize.md
+            url:   quantization/bnb
+          - title: { en: "AWQ",  zh: "AWQ"  }
+            src:   quantization/awq/minicpm-v4_5_awq_quantize.md
+            url:   quantization/awq
+          - title: { en: "GPTQ", zh: "GPTQ" }
+            src:   quantization/gptq/minicpm-v4_5_gptq_quantize.md
+            url:   quantization/gptq
+
+  - id: o4.5
+    label: { en: "MiniCPM-o 4.5", zh: "MiniCPM-o 4.5" }
+    nav:
+      - title: { en: "Overview", zh: "概览" }
+        src:   docs/pages/o4.5/overview.md
+        url:   overview
+
+      - group: { en: "Inference", zh: "推理" }
+        items:
+          - title: { en: "Speech-to-Text", zh: "语音转文本" }
+            src:   inference/speech2text.md
+            url:   inference/speech2text
+          - title: { en: "Text-to-Speech", zh: "文本转语音" }
+            src:   inference/text2speech.md
+            url:   inference/text2speech
+          - title: { en: "Voice cloning",  zh: "语音克隆" }
+            src:   inference/voice_clone.md
+            url:   inference/voice-clone
+          - title: { en: "Omni recognition", zh: "全模态识别" }
+            src:   inference/omni_recognition.md
+            url:   inference/omni-recognition
+
+      - group: { en: "Deployment", zh: "部署" }
+        items:
+          - title: { en: "vLLM",      zh: "vLLM"      }
+            src:   deployment/vllm/minicpm-o4_5_vllm.md
+            url:   deployment/vllm
+          - title: { en: "SGLang",    zh: "SGLang"    }
+            src:   deployment/sglang/minicpm-o4_5_sglang.md
+            url:   deployment/sglang
+          - title: { en: "llama.cpp", zh: "llama.cpp" }
+            src:   deployment/llama.cpp/minicpm-o4_5_llamacpp.md
+            url:   deployment/llamacpp
+          - title: { en: "Ollama",    zh: "Ollama"    }
+            src:   deployment/ollama/minicpm-o4_5_ollama.md
+            url:   deployment/ollama
+
+      - group: { en: "Quantization", zh: "量化" }
+        items:
+          - title: { en: "GGUF", zh: "GGUF" }
+            src:   quantization/gguf/minicpm-o4_5_gguf_quantize.md
+            url:   quantization/gguf
+
+# Cross-version pages (under /shared/...)
+shared:
+  - group: { en: "Fine-tuning", zh: "微调" }
+    items:
+      - title: { en: "Dataset guidance",   zh: "数据集准备" }
+        src:   finetune/dataset_guidance.md
+        src_zh: finetune/dataset_guidance_cn.md
+        url:   finetune/dataset
+      - title: { en: "Full-parameter",     zh: "全参数微调" }
+        src:   finetune/finetune_full.md
+        url:   finetune/full
+      - title: { en: "LoRA",               zh: "LoRA" }
+        src:   finetune/finetune_lora.md
+        url:   finetune/lora
+      - title: { en: "LLaMA-Factory",      zh: "LLaMA-Factory" }
+        src:   finetune/finetune_llamafactory.md
+        url:   finetune/llamafactory
+      - title: { en: "SWIFT",              zh: "SWIFT" }
+        src:   finetune/swift.md
+        url:   finetune/swift
+      - title: { en: "Align-anything",     zh: "Align-anything" }
+        src:   finetune/align_anything.md
+        url:   finetune/align-anything
+
+  - group: { en: "Demos", zh: "演示" }
+    items:
+      - title: { en: "FastAPI Omni Streaming", zh: "FastAPI 全模态流式" }
+        src:   demo/README.md
+        url:   demos/fastapi
+      - title: { en: "Gradio",   zh: "Gradio"   }
+        src:   demo/web_demo/gradio/README.md
+        url:   demos/gradio
+      - title: { en: "iOS",      zh: "iOS"      }
+        src:   demo/ios_demo/ios.md
+        url:   demos/ios

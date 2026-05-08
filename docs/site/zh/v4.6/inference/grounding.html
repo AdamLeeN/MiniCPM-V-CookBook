@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="视觉定位 — 视觉 / 语音 / 实时流多模态 AI 的实战手册。">
+<title>视觉定位 — MiniCPM-V & o Cookbook</title>
+<link rel="icon" type="image/png" href="../../../assets/logos/openbmb.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
+<style>
+:root {
+  --primary: #3680ff;
+  --accent:  #1AC8DB;
+  --sidebar-w: 280px;
+  --bg: #fff;
+  --bg-side: #fafbfc;
+  --bg-code: #f6f8fa;
+  --c1: #24292f;
+  --c2: #57606a;
+  --c3: #8b949e;
+  --border: #d0d7de;
+  --nav-active-bg: rgba(54, 128, 255, .08);
+  --nav-active-fg: var(--primary);
+  --link: var(--primary);
+  --warn-bg: #fff8c5;
+  --warn-bd: #d4a72c;
+  --note-bg: #ddf4ff;
+  --note-bd: #54aeff;
+  --tip-bg:  #dafbe1;
+  --tip-bd:  #1f883d;
+  --important-bg: #fbefff;
+  --important-bd: #8250df;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+               "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  color: var(--c1);
+  line-height: 1.65;
+  background: var(--bg);
+  font-size: 15px;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 18px;
+}
+.topbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-brand img { height: 30px; }
+.topbar-brand .brand-text { font-weight: 600; font-size: 15px; color: var(--c1); white-space: nowrap; }
+.topbar-search { flex: 1; max-width: 480px; position: relative; }
+.topbar-search input {
+  width: 100%; padding: 8px 12px 8px 34px; font-size: 14px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-side);
+  outline: none; transition: border-color .15s;
+}
+.topbar-search input:focus { border-color: var(--primary); }
+.topbar-search::before {
+  content: "🔍"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; opacity: .5;
+}
+.topbar-actions { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+.topbar-actions a { color: var(--c2); }
+.topbar-actions a:hover { color: var(--primary); }
+.topbar-toggle {
+  display: none; background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 10px; font-size: 16px; cursor: pointer;
+}
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  position: fixed; top: 56px; left: 0; bottom: 0; width: var(--sidebar-w);
+  overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border);
+  padding: 16px 0 32px;
+  transition: transform .25s;
+}
+.sidebar-header { padding: 4px 18px 14px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.sidebar-lang-switch {
+  display: inline-block; font-size: 12px; color: var(--primary);
+  text-decoration: none; padding: 3px 12px;
+  border: 1px solid var(--border); border-radius: 999px;
+  transition: background .15s, border-color .15s;
+}
+.sidebar-lang-switch:hover { background: var(--nav-active-bg); border-color: var(--primary); text-decoration: none; }
+.sidebar-lang-switch::before { content: "🌐 "; opacity: .8; margin-right: 2px; }
+
+.version-switcher { padding: 0 18px 12px; }
+.version-switcher select {
+  width: 100%; padding: 7px 10px; font-size: 14px;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  cursor: pointer; outline: none;
+}
+.version-switcher .badge {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; font-size: 11px;
+  border-radius: 999px; background: var(--accent); color: #fff;
+  vertical-align: middle; font-weight: 600;
+}
+.nav-list { list-style: none; padding: 4px 12px; }
+.nav-list a { display: block; padding: 6px 12px; color: var(--c2); border-radius: 6px;
+              font-size: 14px; transition: background .15s, color .15s; }
+.nav-list a:hover { background: #ebeff3; color: var(--c1); text-decoration: none; }
+.nav-list a.active { background: var(--nav-active-bg); color: var(--nav-active-fg); font-weight: 600; }
+.nav-group { margin-top: 8px; }
+.nav-group-header {
+  padding: 6px 12px; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--c1); cursor: pointer;
+  user-select: none; display: flex; align-items: center; gap: 6px;
+  border-radius: 6px; transition: background .15s;
+}
+.nav-group-header:hover { background: #ebeff3; }
+.nav-group-header::before {
+  content: ""; width: 0; height: 0;
+  border-left: 5px solid var(--c2); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform .2s; transform: rotate(90deg);
+}
+.nav-group.collapsed .nav-group-header::before { transform: rotate(0); }
+.nav-group-children { list-style: none; margin: 2px 0 4px 22px; padding-left: 12px;
+                       border-left: 2px solid #e3e7ed;
+                       max-height: 800px; overflow: hidden;
+                       transition: max-height .25s ease, opacity .2s ease, padding .2s ease;
+                       opacity: 1; }
+.nav-group.collapsed .nav-group-children { max-height: 0; opacity: 0; }
+.nav-group-children a { font-size: 13px; padding: 4px 10px; }
+
+.sidebar-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--c3); padding: 14px 18px 4px;
+}
+
+/* ---------- content ---------- */
+.content {
+  margin-left: var(--sidebar-w); margin-top: 56px;
+  max-width: 920px; padding: 36px 56px 80px;
+}
+article h1, article h2, article h3, article h4, article h5 {
+  font-weight: 600; color: var(--c1); margin: 32px 0 12px; line-height: 1.35;
+}
+article h1 { font-size: 28px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-top: 0; }
+article h2 { font-size: 22px; padding-bottom: 8px; border-bottom: 1px solid #eaecef; }
+article h3 { font-size: 18px; }
+article h4 { font-size: 15px; }
+article p, article ul, article ol, article blockquote { margin-bottom: 14px; }
+article ul, article ol { padding-left: 24px; }
+article li { margin-bottom: 4px; }
+article code { background: var(--bg-code); padding: 2px 6px; border-radius: 4px;
+                font-size: 13px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+article pre {
+  background: var(--bg-code); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; margin-bottom: 16px;
+  font-size: 13.5px; line-height: 1.55;
+}
+article pre code { background: none; padding: 0; }
+article table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
+article th, article td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+article th { background: var(--bg-code); font-weight: 600; }
+article tr:nth-child(even) { background: #fafbfc; }
+article hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+article blockquote {
+  border-left: 4px solid var(--primary); padding: 6px 16px; color: var(--c2);
+  background: var(--bg-side); border-radius: 0 6px 6px 0;
+}
+
+article .admonition {
+  border-radius: 8px; padding: 12px 18px; margin: 16px 0;
+  border-left: 4px solid var(--note-bd); background: var(--note-bg);
+}
+article .admonition .admonition-title {
+  font-weight: 700; margin: 0 0 4px; font-size: 13px; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--c1);
+}
+article .admonition-warning  { border-left-color: var(--warn-bd); background: var(--warn-bg); }
+article .admonition-caution  { border-left-color: var(--warn-bd); background: var(--warn-bg); }
+article .admonition-tip      { border-left-color: var(--tip-bd);  background: var(--tip-bg); }
+article .admonition-important{ border-left-color: var(--important-bd); background: var(--important-bg); }
+
+article .mermaid { margin: 16px auto; text-align: center; }
+article .toc { background: var(--bg-side); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; margin: 16px 0; }
+article .toc > ul { padding-left: 20px; margin: 0; }
+
+article a.headerlink { margin-left: 6px; opacity: 0; }
+article :hover > a.headerlink { opacity: .5; }
+
+footer.page-footer { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--border);
+                     color: var(--c2); font-size: 13px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+footer.page-footer a { color: var(--c2); }
+footer.page-footer a:hover { color: var(--primary); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px) {
+  .topbar-toggle { display: inline-block; }
+  .topbar-search { display: none; }
+  .sidebar { transform: translateX(-100%); box-shadow: 2px 0 12px rgba(0,0,0,.08); }
+  .sidebar.open { transform: translateX(0); }
+  .content { margin-left: 0; padding: 28px 22px 60px; }
+}
+</style>
+</head>
+<body data-version="v4.6" data-lang="zh" data-slug="v4.6/inference/grounding">
+
+<header class="topbar">
+  <button class="topbar-toggle" aria-label="Toggle navigation" onclick="toggleSidebar()">☰</button>
+  <a class="topbar-brand" href="../../index.html">
+    <img src="../../../assets/logos/minicpmv.png" alt="MiniCPM-V">
+    <span class="brand-text">MiniCPM-V & o Cookbook</span>
+  </a>
+  <div class="topbar-search">
+    <input type="search" placeholder="搜索文档…" id="pagefind-search">
+  </div>
+  <nav class="topbar-actions">
+    <a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/openbmb" target="_blank" rel="noopener">HuggingFace</a>
+    <a href="https://modelscope.cn/organization/OpenBMB" target="_blank" rel="noopener">魔搭社区</a>
+    <a href="https://discord.gg/rftuRMbqzf" target="_blank" rel="noopener">Discord</a>
+    <a href="https://huggingface.co/papers/2509.18154" target="_blank" rel="noopener">技术报告</a>
+  </nav>
+</header>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a class="sidebar-lang-switch" href="../../../en/v4.6/inference/grounding.html" rel="alternate" hreflang="en">English</a>
+  </div>
+  <ul class="nav-list">
+  <li><a class="" href="../../index.html">首页</a></li>
+</ul>
+<div class="sidebar-section-title">版本</div>
+<div class="version-switcher">
+  <select id="version-switcher-select">
+    <option value="grounding.html" selected>MiniCPM-V 4.6 [latest]</option>
+    <option value="../../v4.5/inference/grounding.html">MiniCPM-V 4.5</option>
+    <option value="../../o4.5/inference/grounding.html">MiniCPM-o 4.5</option>
+  </select>
+</div>
+<ul class="nav-list">
+<li><a class="" href="../overview.html">概览</a></li>
+<li class="nav-group"><div class="nav-group-header">推理</div><ul class="nav-group-children"><li><a class="" href="single-image.html">单图问答</a></li>
+<li><a class="" href="multi-images.html">多图问答</a></li>
+<li><a class="" href="video-understanding.html">视频理解</a></li>
+<li><a class="" href="ocr.html">OCR</a></li>
+<li><a class="" href="pdf-parse.html">PDF 解析</a></li>
+<li><a class="active" href="grounding.html">视觉定位</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">部署</div><ul class="nav-group-children"><li><a class="" href="../deployment/vllm.html">vLLM</a></li>
+<li><a class="" href="../deployment/sglang.html">SGLang</a></li>
+<li><a class="" href="../deployment/llamacpp.html">llama.cpp</a></li>
+<li><a class="" href="../deployment/ollama.html">Ollama</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">量化</div><ul class="nav-group-children"><li><a class="" href="../quantization/gguf.html">GGUF</a></li>
+<li><a class="" href="../quantization/bnb.html">BNB</a></li>
+<li><a class="" href="../quantization/awq.html">AWQ</a></li></ul></li>
+</ul>
+<div class="sidebar-section-title">跨版本</div>
+<ul class="nav-list">
+<li class="nav-group"><div class="nav-group-header">微调</div><ul class="nav-group-children"><li><a class="" href="../../shared/finetune/dataset.html">数据集准备</a></li>
+<li><a class="" href="../../shared/finetune/full.html">全参数微调</a></li>
+<li><a class="" href="../../shared/finetune/lora.html">LoRA</a></li>
+<li><a class="" href="../../shared/finetune/llamafactory.html">LLaMA-Factory</a></li>
+<li><a class="" href="../../shared/finetune/swift.html">SWIFT</a></li>
+<li><a class="" href="../../shared/finetune/align-anything.html">Align-anything</a></li></ul></li>
+<li class="nav-group"><div class="nav-group-header">演示</div><ul class="nav-group-children"><li><a class="" href="../../shared/demos/fastapi.html">FastAPI 全模态流式</a></li>
+<li><a class="" href="../../shared/demos/gradio.html">Gradio</a></li>
+<li><a class="" href="../../shared/demos/ios.html">iOS</a></li></ul></li>
+</ul>
+</aside>
+
+<main class="content" id="content">
+  <article><h1 id="视觉定位-grounding-minicpm-v-4-6">视觉定位 Grounding（MiniCPM-V 4.6）</h1>
+<h2 id="示例代码">示例代码</h2>
+<div class="code"><pre><span></span><code><span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">ImageDraw</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoProcessor</span><span class="p">,</span> <span class="n">AutoModelForImageTextToText</span>
+
+
+<span class="k">def</span> <span class="nf">setup_model_and_processor</span><span class="p">(</span><span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="n">processor</span> <span class="o">=</span> <span class="n">AutoProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">AutoModelForImageTextToText</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+        <span class="n">model_path</span><span class="p">,</span>
+        <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+        <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">&quot;sdpa&quot;</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">model</span><span class="p">,</span> <span class="n">processor</span>
+
+
+<span class="k">def</span> <span class="nf">extract_bbox_from_response</span><span class="p">(</span><span class="n">response</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&lt;box&gt;([\d\s]+)&lt;/box&gt;&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Can&#39;t find bbox in response&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+
+
+<span class="k">def</span> <span class="nf">draw_bbox_on_image</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">,</span> <span class="n">bbox</span><span class="p">):</span>
+    <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">size</span>
+    <span class="n">x1</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">w</span><span class="p">)</span>
+    <span class="n">y1</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span>
+    <span class="n">x2</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">w</span><span class="p">)</span>
+    <span class="n">y2</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span>
+    <span class="n">draw</span> <span class="o">=</span> <span class="n">ImageDraw</span><span class="o">.</span><span class="n">Draw</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+    <span class="n">draw</span><span class="o">.</span><span class="n">rectangle</span><span class="p">([</span><span class="n">x1</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">y2</span><span class="p">],</span> <span class="n">outline</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">image</span>
+
+
+<span class="k">def</span> <span class="nf">model_infer_and_draw</span><span class="p">(</span><span class="n">img_path</span><span class="p">,</span> <span class="n">question</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">processor</span><span class="p">):</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span>
+    <span class="n">messages</span> <span class="o">=</span> <span class="p">[{</span>
+        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;image&quot;</span><span class="p">,</span> <span class="s2">&quot;image&quot;</span><span class="p">:</span> <span class="n">image</span><span class="p">},</span>
+            <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;text&quot;</span><span class="p">,</span>  <span class="s2">&quot;text&quot;</span><span class="p">:</span>  <span class="n">question</span><span class="p">},</span>
+        <span class="p">],</span>
+    <span class="p">}]</span>
+
+    <span class="n">inputs</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">apply_chat_template</span><span class="p">(</span>
+        <span class="n">messages</span><span class="p">,</span>
+        <span class="n">add_generation_prompt</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">tokenize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">return_dict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">inference_mode</span><span class="p">():</span>
+        <span class="n">out_ids</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="o">**</span><span class="n">inputs</span><span class="p">,</span> <span class="n">max_new_tokens</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span>
+        <span class="n">out_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">inputs</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:],</span>
+        <span class="n">skip_special_tokens</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;模型输出:&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
+
+    <span class="n">bbox</span> <span class="o">=</span> <span class="n">extract_bbox_from_response</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">response</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">draw_bbox_on_image</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">bbox</span><span class="p">)</span>
+
+
+<span class="n">model_path</span> <span class="o">=</span> <span class="s2">&quot;openbmb/MiniCPM-V-4_6&quot;</span>
+<span class="n">img_path</span> <span class="o">=</span> <span class="s2">&quot;./assets/airplane.jpeg&quot;</span>
+<span class="n">question</span> <span class="o">=</span> <span class="s2">&quot;Please provide the bounding box coordinate of the region this sentence describes: &lt;ref&gt;airplane&lt;/ref&gt;&quot;</span>
+
+<span class="n">model</span><span class="p">,</span> <span class="n">processor</span> <span class="o">=</span> <span class="n">setup_model_and_processor</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+<span class="n">response</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">image_with_box</span> <span class="o">=</span> <span class="n">model_infer_and_draw</span><span class="p">(</span><span class="n">img_path</span><span class="p">,</span> <span class="n">question</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">processor</span><span class="p">)</span>
+<span class="n">image_with_box</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;./assets/airplane_grounding.jpeg&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<h2 id="效果展示">效果展示</h2>
+<h3 id="飞机">飞机</h3>
+<p>原图：</p>
+<p><img alt="alt text" src="./assets/airplane.jpeg"></p>
+<p>定位后：</p>
+<p><img alt="alt text" src="./assets/airplane-grounding.jpeg"></p>
+<h3 id="多目标">多目标</h3>
+<p>多目标定位时，让模型直接返回 JSON 而不是 <code>&lt;box&gt;</code>，再相应解析：</p>
+<div class="code"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">ImageDraw</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoProcessor</span><span class="p">,</span> <span class="n">AutoModelForImageTextToText</span>
+
+
+<span class="k">def</span> <span class="nf">extract_bboxes_from_json_response</span><span class="p">(</span><span class="n">response</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="n">response_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+    <span class="n">bboxes</span><span class="p">,</span> <span class="n">names</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">response_json</span><span class="p">:</span>
+        <span class="n">bbox_str</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&lt;/?box&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;box&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">bboxes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">bbox_str</span><span class="o">.</span><span class="n">split</span><span class="p">())))</span>
+        <span class="n">names</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name_en&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name_zh&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">bboxes</span><span class="p">,</span> <span class="n">names</span>
+
+
+<span class="k">def</span> <span class="nf">draw_multiple_bboxes</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">,</span> <span class="n">bboxes</span><span class="p">,</span> <span class="n">names</span><span class="p">):</span>
+    <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">size</span>
+    <span class="n">draw</span> <span class="o">=</span> <span class="n">ImageDraw</span><span class="o">.</span><span class="n">Draw</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">y2</span><span class="p">),</span> <span class="p">(</span><span class="n">en</span><span class="p">,</span> <span class="n">zh</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">bboxes</span><span class="p">,</span> <span class="n">names</span><span class="p">):</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">x1</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">w</span><span class="p">);</span> <span class="n">y1</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">y1</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">x2</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">x2</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">w</span><span class="p">);</span> <span class="n">y2</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">y2</span> <span class="o">/</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">draw</span><span class="o">.</span><span class="n">rectangle</span><span class="p">([</span><span class="n">x1</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">y2</span><span class="p">],</span> <span class="n">outline</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+        <span class="n">draw</span><span class="o">.</span><span class="n">text</span><span class="p">((</span><span class="n">x1</span><span class="p">,</span> <span class="n">y1</span> <span class="o">-</span> <span class="mi">10</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">en</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="n">zh</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">image</span>
+
+
+<span class="n">model_path</span> <span class="o">=</span> <span class="s2">&quot;openbmb/MiniCPM-V-4_6&quot;</span>
+<span class="n">img_path</span> <span class="o">=</span> <span class="s2">&quot;./assets/doraemon.jpg&quot;</span>
+<span class="n">question</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">&quot;Identify all characters in the image and return their bounding boxes &quot;</span>
+    <span class="s2">&quot;and English name and Chinese name in JSON format, &quot;</span>
+    <span class="s1">&#39;a list of {&quot;name_en&quot;: &quot;Doraemon&quot;, &quot;name_zh&quot;: &quot;哆啦A梦&quot;, &quot;box&quot;: &quot;x1 y1 x2 y2&quot;}&#39;</span>
+<span class="p">)</span>
+
+<span class="n">processor</span> <span class="o">=</span> <span class="n">AutoProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">AutoModelForImageTextToText</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+    <span class="n">model_path</span><span class="p">,</span> <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">&quot;sdpa&quot;</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span>
+<span class="n">messages</span> <span class="o">=</span> <span class="p">[{</span>
+    <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;image&quot;</span><span class="p">,</span> <span class="s2">&quot;image&quot;</span><span class="p">:</span> <span class="n">image</span><span class="p">},</span>
+        <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;text&quot;</span><span class="p">,</span>  <span class="s2">&quot;text&quot;</span><span class="p">:</span>  <span class="n">question</span><span class="p">},</span>
+    <span class="p">],</span>
+<span class="p">}]</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">apply_chat_template</span><span class="p">(</span>
+    <span class="n">messages</span><span class="p">,</span> <span class="n">add_generation_prompt</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">tokenize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">return_dict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">inference_mode</span><span class="p">():</span>
+    <span class="n">out_ids</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="o">**</span><span class="n">inputs</span><span class="p">,</span> <span class="n">max_new_tokens</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+
+<span class="n">response</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span>
+    <span class="n">out_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">inputs</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:],</span> <span class="n">skip_special_tokens</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">bboxes</span><span class="p">,</span> <span class="n">names</span> <span class="o">=</span> <span class="n">extract_bboxes_from_json_response</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+<span class="n">draw_multiple_bboxes</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">bboxes</span><span class="p">,</span> <span class="n">names</span><span class="p">)</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;./assets/doraemon_multi_grounding.jpg&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>原图：</p>
+<p><img alt="alt text" src="./assets/doraemon.jpg"></p>
+<p>定位后：</p>
+<p><img alt="alt text" src="./assets/doraemon_multi_grounding.jpg"></p></article>
+
+  <footer class="page-footer">
+    <span>© OpenBMB · <a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook">GitHub 仓库</a></span>
+    <span>由 <code>build_docs.py</code> 自动生成</span>
+  </footer>
+</main>
+
+<script>
+  // ----- core UI behaviour (must run even if external CDNs are blocked) -----
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  document.querySelectorAll('.nav-group-header').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+  });
+
+  // Close sidebar when clicking a link on mobile.
+  document.querySelectorAll('.sidebar a').forEach(a => {
+    a.addEventListener('click', () => {
+      if (window.innerWidth <= 900) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
+    });
+  });
+
+  // Version switcher dropdown.
+  const verSel = document.getElementById('version-switcher-select');
+  if (verSel) {
+    verSel.addEventListener('change', e => {
+      const target = e.target.value;
+      if (target) window.location.href = target;
+    });
+  }
+</script>
+
+<!-- Optional enhancements below. Wrapped so a CDN hiccup never breaks the
+     interactive sidebar / version switcher above. -->
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js" onerror="window.__hljsBlocked=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/common.min.js" onerror="window.__hljsBlocked=true"></script>
+<script>
+  try { if (typeof hljs !== 'undefined') hljs.highlightAll(); } catch (e) { console.warn('hljs failed:', e); }
+</script>
+<script type="module">
+  try {
+    const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+    m.default.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+  } catch (e) { console.warn('mermaid failed:', e); }
+</script>
+<link href="https://cdn.jsdelivr.net/npm/@pagefind/default-ui@1/css/ui.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@pagefind/default-ui@1/npm/index.js"></script>
+<script>
+  // Pagefind is loaded from a relative path emitted at build time.
+  const inp = document.getElementById("pagefind-search");
+  if (inp) {
+    inp.addEventListener("focus", function once() {
+      inp.removeEventListener("focus", once);
+      const root = inp.parentElement;
+      const div = document.createElement("div"); div.id = "search"; root.appendChild(div);
+      new PagefindUI({ element: "#search", showSubResults: true });
+    });
+  }
+</script>
+
+</body>
+</html>

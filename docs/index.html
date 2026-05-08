@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MiniCPM-V &amp; o Cookbook</title>
+  <meta http-equiv="refresh" content="0; url=./site/index.html">
+  <script>
+    // GitHub Pages serves this directory as the site root for the cookbook
+    // (https://opensqz.github.io/MiniCPM-V-CookBook/). The actual rendered
+    // pages live in `./site/{en,zh}/`. Redirect to the built site, picking
+    // the user's language preference when possible.
+    (function () {
+      var lang = (navigator.language || 'en').toLowerCase();
+      var target = lang.startsWith('zh') ? 'zh' : 'en';
+      location.replace('./site/' + target + '/index.html');
+    })();
+  </script>
+</head>
+<body>
+  <p>Redirecting to the
+    <a href="./site/en/index.html">English</a> /
+    <a href="./site/zh/index.html">中文</a> documentation…</p>
+</body>
+</html>

@@ -84,7 +84,7 @@ Multiple deployment solutions for efficient MiniCPM-o model deployment across di
     </tr>
     <tr>
       <td>SGLang</td>
-      <td><a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook/blob/main/deployment/sglang/MiniCPM-v4_5_sglang.md">SGLang Doc</a></td>
+      <td><a href="https://github.com/OpenSQZ/MiniCPM-V-CookBook/blob/main/deployment/sglang/minicpm-v4_5_sglang.md">SGLang Doc</a></td>
       <td><a href="https://github.com/sgl-project/sglang/pull/9610">#9610</a>(2025-08-26)</td>
       <td>Merging</td>
       <td>Waiting for official release</td>

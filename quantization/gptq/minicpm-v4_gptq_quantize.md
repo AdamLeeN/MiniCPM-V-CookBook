@@ -6,15 +6,17 @@
 
 ## Method 1 (Use the pre-quantized model)
 
-### 1.Download the Model
-<!-- 下载量化模型
-https://huggingface.co/openbmb/MiniCPM-V-4-GPTQ-Int4
- -->
+> [!NOTE]
+> The HuggingFace mirror (`openbmb/MiniCPM-V-4-GPTQ`) hasn't been published yet — it will be online soon. For now download from **ModelScope** below, or use **Method 2** to quantize the model yourself.
 
-Download the 4-bit quantized MiniCPM-V-4 model with GPTQ from [HuggingFace](https://huggingface.co/openbmb/MiniCPM-V-4-GPTQ-Int4)
+### 1.Download the Model
+
+* **ModelScope** — <https://modelscope.cn/models/OpenBMB/MiniCPM-V-4-GPTQ>
+* HuggingFace (coming soon) — <https://huggingface.co/openbmb/MiniCPM-V-4-GPTQ>
 
 ```Bash
-git clone https://huggingface.co/openbmb/MiniCPM-V-4-GPTQ-Int4
+# from ModelScope
+git clone https://modelscope.cn/OpenBMB/MiniCPM-V-4-GPTQ
 ```
 
 ### 2.Run with vllm
@@ -27,7 +29,7 @@ from vllm import LLM, SamplingParams
 
 
 # Quantized model name or path
-MODEL_NAME = "openbmb/MiniCPM-V-4-GPTQ-Int4"
+MODEL_NAME = "openbmb/MiniCPM-V-4-GPTQ"
 
 # List of image file paths
 IMAGES = [
