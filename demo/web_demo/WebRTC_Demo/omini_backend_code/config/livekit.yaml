@@ -7,10 +7,12 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
-  # 禁用外部 IP 探测，使用指定的 node_ip
-  use_external_ip: false
-  # 使用宿主机实际 IP
-  node_ip: "192.168.31.127"
+  # 🔧 [公网/Docker 部署必须] 启用外部 IP 探测，对外宣告公网地址
+  # 如果此项为 false，LiveKit 只会宣告 127.0.0.1 等内网地址，
+  # 导致外网客户端 ICE 连接失败（could not establish pc connection）
+  use_external_ip: true
+  # 公网 IP（穿透后的地址或云服务器公网 IP）
+  node_ip: "117.72.163.123"
 
 # 房间配置
 room:
@@ -24,8 +26,8 @@ keys:
 # LiveKit内置TURN服务器配置（帮助穿透NAT，确保前端能连接）
 turn:
   enabled: true
-  # 使用宿主机实际 IP
-  domain: "192.168.31.127"
+  # 公网 IP（穿透后的地址）
+  domain: "117.72.163.123"
   # UDP端口
   udp_port: 7882
   # 不使用TLS（本地开发）

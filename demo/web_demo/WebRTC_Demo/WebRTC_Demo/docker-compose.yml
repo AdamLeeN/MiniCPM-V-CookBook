@@ -1,0 +1,73 @@
+version: '3.8'
+
+# MiniCPM-o 前后端联调 Docker Compose 配置 (Lite 本地版 - 无Redis)
+# 用法: docker compose up -d
+
+services:
+  # ====================== LiveKit 服务 ======================
+  livekit:
+    image: livekit/livekit-server:v1.5.3
+    container_name: minicpmo-livekit
+    restart: unless-stopped
+    ports:
+      - "7880:7880"   # HTTP API
+      - "7891:7881"   # TCP WebRTC (避开7881端口冲突)
+      - "7882:7882/udp"  # UDP TURN
+      - "50000-50100:50000-50100/udp"  # WebRTC UDP 端口范围
+    volumes:
+      - ./omini_backend_code/config/livekit.yaml:/livekit.yaml:ro
+    command: --config /livekit.yaml
+    networks:
+      - minicpmo-net
+
+  # ====================== 后端服务 (挂载本地代码，无Redis) ======================
+  backend:
+    image: ghcr.io/openbmb/minicpmo-backend:latest
+    container_name: minicpmo-backend
+    restart: unless-stopped
+    ports:
+      - "8025:8021"   # 后端 API + 推理节点注册 (宿主机 8025 避免 macOS 端口冲突)
+      - "8032:8022"   # 备用端口 (避开8022端口冲突)
+    environment:
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret
+      # 推理节点注册配置
+      - INFERENCE_REGISTER_ENABLED=true
+      # 修复 numba/librosa JIT 缓存目录权限问题
+      - NUMBA_CACHE_DIR=/tmp/numba_cache
+      # 本地部署使用单 worker（内存存储需要单进程一致性）
+      - WORKERS=1
+    volumes:
+      # 挂载修改后的本地代码，覆盖镜像中的 /app
+      - ./omini_backend_code/code:/app
+    depends_on:
+      - livekit
+    networks:
+      - minicpmo-net
+
+  # ====================== 前端服务 ======================
+  frontend:
+    image: ghcr.io/openbmb/minicpmo-frontend:latest
+    container_name: minicpmo-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"   # 前端 Web UI (nginx 监听 80)
+    volumes:
+      # 挂载自定义 nginx 配置，使用 Docker 内部网络地址
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # 挂载源码构建的前端产物（如果存在），覆盖镜像中的默认版本
+      - ./frontend-dist:/usr/share/nginx/html:ro
+    environment:
+      # API 地址指向后端
+      - NEXT_PUBLIC_API_URL=http://localhost:8025
+      # LiveKit 配置
+      - NEXT_PUBLIC_LIVEKIT_URL=ws://localhost:7880
+    depends_on:
+      - backend
+    networks:
+      - minicpmo-net
+
+networks:
+  minicpmo-net:
+    driver: bridge

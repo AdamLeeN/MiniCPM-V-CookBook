@@ -3,7 +3,10 @@
 # MiniCPM-o WebRTC Demo One-Click Deployment Script (without Docker)
 # Automatically downloads source code, models, compiles inference engine,
 # and starts all services.
-# Startup order: LiveKit Server -> Backend -> C++ Inference -> Frontend
+#
+# 🔧 [WSL2 部署] LiveKit 必须在 Windows 原生运行，WSL2 内无法提供 UDP 互通。
+#   启动前请先运行 PowerShell: .\start-livekit-windows.ps1
+# Startup order: Backend -> C++ Inference -> Frontend (LiveKit 在 Windows 侧)
 #
 # Simplest usage (one script, fully automatic):
 #   PYTHON_CMD=/path/to/python bash one_click.sh start
@@ -19,7 +22,13 @@
 #   CPP_MODE         - duplex (default) or simplex
 #   FRONTEND_MODE    - prod (default) or dev (Vite hot reload)
 #   GITHUB_PROXY     - GitHub download proxy
-#   HF_ENDPOINT      - HuggingFace mirror (e.g. https://hf-mirror.com)
+#   MS_MODEL_REPO    - ModelScope model repository (default: openbmb/MiniCPM-o-4_5-gguf)
+#   MODELSCOPE_CACHE - ModelScope cache directory
+#
+# WSL2 注意事项:
+#   - 必须启用 WSL2 mirrored 模式 (C:\Users\<user>\.wslconfig 中 networkingMode=mirrored)
+#   - LiveKit 必须在 Windows 侧运行，脚本不再管理 LiveKit
+#   - 启动前请先运行: .\start-livekit-windows.ps1
 # ============================================================================
 
 set -euo pipefail
@@ -72,7 +81,7 @@ MODEL_DIR="${MODEL_DIR:-$SCRIPT_DIR/models/openbmb/MiniCPM-o-4_5-gguf}"
 # Options: Q4_0, Q4_1, Q4_K_M, Q4_K_S, Q5_0, Q5_1, Q5_K_M, Q5_K_S, Q6_K, Q8_0, F16
 LLM_QUANT="${LLM_QUANT:-Q4_K_M}"
 # Inference mode: duplex (full-duplex) or simplex (half-duplex)
-CPP_MODE="${CPP_MODE:-duplex}"
+CPP_MODE="${CPP_MODE:-simplex}"
 # Vision encoder backend (macOS only): metal (GPU) or coreml (ANE acceleration)
 # On Linux, left empty (uses cpp_server default behavior)
 VISION_BACKEND="${VISION_BACKEND:-$([ "$(uname -s)" = "Darwin" ] && echo coreml || echo "")}"
@@ -81,19 +90,18 @@ NODE_MIN_VERSION="18"
 
 # ======================== PID Files ========================
 PID_DIR="$SCRIPT_DIR/.pids"
-LIVEKIT_PID="$PID_DIR/livekit.pid"
 BACKEND_PID="$PID_DIR/backend.pid"
 FRONTEND_PID="$PID_DIR/frontend.pid"
 CPP_SERVER_PID="$PID_DIR/cpp_server.pid"
 
 # ======================== Log Files ========================
 LOG_DIR="$SCRIPT_DIR/.logs"
-LIVEKIT_LOG="$LOG_DIR/livekit.log"
 BACKEND_LOG="$LOG_DIR/backend.log"
 FRONTEND_LOG="$LOG_DIR/frontend.log"
 CPP_SERVER_LOG="$LOG_DIR/cpp_server.log"
 
 # ======================== LiveKit Configuration ========================
+# 🔧 [WSL2] LiveKit 在 Windows 侧运行，配置通过 livekit-windows.yaml
 LIVEKIT_API_KEY="devkey"
 # v1.9+ requires secret to be at least 32 characters
 LIVEKIT_API_SECRET="secretsecretsecretsecretsecretsecret"
@@ -104,12 +112,11 @@ COOKBOOK_REPO="${COOKBOOK_REPO:-https://github.com/OpenSQZ/MiniCPM-V-CookBook.gi
 COOKBOOK_BRANCH="${COOKBOOK_BRANCH:-main}"
 # llama.cpp-omni Git repository
 LLAMACPP_REPO="${LLAMACPP_REPO:-https://github.com/tc-mb/llama.cpp-omni.git}"
-# HuggingFace model repository (GGUF format)
-HF_MODEL_REPO="${HF_MODEL_REPO:-openbmb/MiniCPM-o-4_5-gguf}"
-# HuggingFace mirror (for faster downloads in China; leave empty for official huggingface.co)
-# Reusing the official HF_ENDPOINT environment variable supported by huggingface-cli
-HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
-export HF_ENDPOINT
+# ModelScope model repository (GGUF format)
+MS_MODEL_REPO="${MS_MODEL_REPO:-openbmb/MiniCPM-o-4_5-gguf}"
+# ModelScope cache directory (optional override)
+MODELSCOPE_CACHE="${MODELSCOPE_CACHE:-$HOME/.cache/modelscope}"
+export MODELSCOPE_CACHE
 
 # ======================== Mirror Acceleration (overridable via env vars) ========================
 # GitHub proxy (for faster GitHub Release downloads in China; leave empty for direct connection)
@@ -121,10 +128,8 @@ NODE_MIRROR="${NODE_MIRROR:-https://npmmirror.com/mirrors/node}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
 
 # ======================== Ports (overridable via env vars) ========================
-# Set AUTO_PORT=1 to automatically find available ports if defaults are in use
-AUTO_PORT="${AUTO_PORT:-1}"
-
-# Default ports (will be auto-adjusted if AUTO_PORT=1 and port is in use)
+# 🔧 [固定端口] 端口不再自动分配，如果被占用会尝试杀掉进程
+# 设置环境变量可覆盖默认值，如: LIVEKIT_PORT=7880 bash oneclick.sh start
 LIVEKIT_PORT="${LIVEKIT_PORT:-7880}"
 BACKEND_PORT="${BACKEND_PORT:-8021}"
 FRONTEND_PORT="${FRONTEND_PORT:-8088}"
@@ -150,6 +155,11 @@ err()   { echo -e "${RED}[ERROR]${NC} $*"; }
 # ======================== Utility Functions ========================
 
 get_local_ip() {
+    # WSL: use localhost for same-machine deployment (avoids firewall/NAT issues)
+    if [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || [[ "$(uname -r)" == *microsoft* ]] || [[ "$(uname -r)" == *WSL* ]]; then
+        echo "127.0.0.1"
+        return
+    fi
     # macOS
     if command -v ipconfig &>/dev/null; then
         local ip
@@ -433,64 +443,38 @@ find_available_port() {
 }
 
 auto_allocate_ports() {
-    # 自动分配可用端口（如果启用 AUTO_PORT=1）
-    if [[ "$AUTO_PORT" != "1" ]]; then
-        return 0
-    fi
+    # 端口固定策略：WSL2 服务端口被占用时尝试杀掉占用进程
+    # LiveKit 在 Windows 侧运行，不检查/不关闭
+    
+    info "Checking WSL2 service ports..."
 
-    info "Auto-allocating available ports (AUTO_PORT=1)..."
-
-    # LiveKit
-    if is_port_in_use "$LIVEKIT_PORT"; then
-        local new_port
-        new_port=$(find_available_port "$LIVEKIT_PORT")
-        if [[ "$new_port" != "$LIVEKIT_PORT" ]]; then
-            warn "Port $LIVEKIT_PORT in use, using $new_port for LiveKit"
-            LIVEKIT_PORT="$new_port"
+    # 只检查 WSL2 服务的端口（Backend, Frontend, C++ Server）
+    # LiveKit 在 Windows 侧，跳过
+    for port in "$BACKEND_PORT" "$FRONTEND_PORT" "$CPP_SERVER_PORT"; do
+        if is_port_in_use "$port"; then
+            warn "Port $port is in use, attempting to free it..."
+            # 尝试杀掉占用端口的进程
+            local pids
+            pids=$(lsof -ti :"$port" 2>/dev/null || ss -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d',' -f2 | cut -d'=' -f2 | head -1)
+            if [[ -n "$pids" ]]; then
+                kill -9 $pids 2>/dev/null || true
+                sleep 1
+            fi
+            # 再次检查
+            if is_port_in_use "$port"; then
+                err "Port $port is still in use after attempting to free it. Please stop the service manually."
+                exit 1
+            fi
         fi
-    fi
+    done
 
-    # Backend
-    if is_port_in_use "$BACKEND_PORT"; then
-        local new_port
-        new_port=$(find_available_port "$BACKEND_PORT")
-        if [[ "$new_port" != "$BACKEND_PORT" ]]; then
-            warn "Port $BACKEND_PORT in use, using $new_port for Backend"
-            BACKEND_PORT="$new_port"
-        fi
-    fi
-
-    # Frontend
-    if is_port_in_use "$FRONTEND_PORT"; then
-        local new_port
-        new_port=$(find_available_port "$FRONTEND_PORT")
-        if [[ "$new_port" != "$FRONTEND_PORT" ]]; then
-            warn "Port $FRONTEND_PORT in use, using $new_port for Frontend"
-            FRONTEND_PORT="$new_port"
-        fi
-    fi
-
-    # C++ Server (also update derived ports)
-    if is_port_in_use "$CPP_SERVER_PORT"; then
-        local new_port
-        new_port=$(find_available_port "$CPP_SERVER_PORT")
-        if [[ "$new_port" != "$CPP_SERVER_PORT" ]]; then
-            warn "Port $CPP_SERVER_PORT in use, using $new_port for C++ Server"
-            CPP_SERVER_PORT="$new_port"
-            CPP_HEALTH_PORT=$((CPP_SERVER_PORT + 1))
-            CPP_LLAMA_PORT=$((CPP_SERVER_PORT + 10000))
-        fi
-    fi
-
-    if [[ "$AUTO_PORT" == "1" ]]; then
-        ok "Port allocation complete:"
-        echo "  LiveKit:     $LIVEKIT_PORT"
-        echo "  Backend:     $BACKEND_PORT"
-        echo "  Frontend:    $FRONTEND_PORT"
-        echo "  C++ Server:  $CPP_SERVER_PORT"
-        echo "  C++ Health:  $CPP_HEALTH_PORT"
-        echo "  C++ Llama:   $CPP_LLAMA_PORT"
-    fi
+    ok "All WSL2 ports are available:"
+    echo "  Backend:     $BACKEND_PORT"
+    echo "  Frontend:    $FRONTEND_PORT"
+    echo "  C++ Server:  $CPP_SERVER_PORT"
+    echo "  C++ Health:  $CPP_HEALTH_PORT"
+    echo "  C++ Llama:   $CPP_LLAMA_PORT"
+    echo "  LiveKit:     $LIVEKIT_PORT  (Windows side, not checked)"
 }
 
 kill_by_pidfile() {
@@ -688,11 +672,13 @@ build_llama_server() {
     if ! command -v cmake &>/dev/null; then
         err "cmake is not installed"
         err "  macOS: brew install cmake"
-        err "  Linux: apt install cmake or yum install cmake"
+        err "  Linux: apt install cmake build-essential libcurl4-openssl-dev"
+        err "  Linux: yum install cmake gcc-c++ make libcurl-devel"
         return 1
     fi
     if ! command -v make &>/dev/null && ! command -v ninja &>/dev/null; then
         err "make or ninja is not installed"
+        err "  Linux: apt install build-essential"
         return 1
     fi
 
@@ -858,73 +844,54 @@ download_models() {
 
     info "Auto-downloading GGUF models..."
 
-    # Detect or install HuggingFace CLI
-    local hf_cli="" hf_dl_cmd=""
+    # Detect or install modelscope
+    local ms_cli="" ms_dl_cmd=""
     local python_bin_dir
     python_bin_dir="$(dirname "$PYTHON_CMD")"
 
-    # Priority 1: Check if hf/huggingface-cli is now in PATH (including from python env)
-    # Temporarily add python bin dir to PATH so conda/venv CLIs are found
+    # Priority 1: Check if modelscope CLI is in PATH (including from python env)
     PATH="$python_bin_dir:$PATH"
-    if command -v hf &>/dev/null; then
-        local hf_path
-        hf_path="$(command -v hf)"
-        hf_cli="hf"
-        hf_dl_cmd="$hf_path download"
-        info "Found hf CLI: $hf_path"
-    elif command -v huggingface-cli &>/dev/null; then
-        local hfcli_path
-        hfcli_path="$(command -v huggingface-cli)"
-        hf_cli="huggingface-cli"
-        hf_dl_cmd="$hfcli_path download"
-        info "Found huggingface-cli: $hfcli_path"
+    if command -v modelscope &>/dev/null; then
+        local ms_path
+        ms_path="$(command -v modelscope)"
+        ms_cli="modelscope"
+        ms_dl_cmd="$ms_path download"
+        info "Found modelscope CLI: $ms_path"
     # Priority 2: Try python -m invocation if module is installed
-    elif "$PYTHON_CMD" -c "import huggingface_hub" &>/dev/null; then
-        hf_cli="python -m huggingface_hub.cli"
-        hf_dl_cmd="$PYTHON_CMD -m huggingface_hub.cli download"
+    elif "$PYTHON_CMD" -c "import modelscope" &>/dev/null; then
+        ms_cli="python -m modelscope"
+        ms_dl_cmd="$PYTHON_CMD -m modelscope.cli download"
     # Priority 3: Not found, attempt to install
     else
-        info "huggingface_hub not found, attempting auto-install..."
-        $PIP_CMD install -U huggingface_hub $PIP_TRUSTED_HOSTS --progress-bar on || {
-            warn "Failed to auto-install huggingface_hub"
+        info "modelscope not found, attempting auto-install..."
+        $PIP_CMD install -U modelscope $PIP_TRUSTED_HOSTS --progress-bar on || {
+            warn "Failed to auto-install modelscope"
         }
         # Re-detect after install
-        if command -v hf &>/dev/null; then
-            local hf_path
-            hf_path="$(command -v hf)"
-            hf_cli="hf"
-            hf_dl_cmd="$hf_path download"
-        elif command -v huggingface-cli &>/dev/null; then
-            local hfcli_path
-            hfcli_path="$(command -v huggingface-cli)"
-            hf_cli="huggingface-cli"
-            hf_dl_cmd="$hfcli_path download"
-        elif "$PYTHON_CMD" -c "import huggingface_hub" &>/dev/null; then
-            hf_cli="python -m huggingface_hub.cli"
-            hf_dl_cmd="$PYTHON_CMD -m huggingface_hub.cli download"
+        if command -v modelscope &>/dev/null; then
+            local ms_path
+            ms_path="$(command -v modelscope)"
+            ms_cli="modelscope"
+            ms_dl_cmd="$ms_path download"
+        elif "$PYTHON_CMD" -c "import modelscope" &>/dev/null; then
+            ms_cli="python -m modelscope"
+            ms_dl_cmd="$PYTHON_CMD -m modelscope.cli download"
         fi
     fi
 
-    if [[ -n "$hf_cli" ]]; then
-        info "Using $hf_cli to download model: $HF_MODEL_REPO"
+    if [[ -n "$ms_cli" ]]; then
+        info "Using $ms_cli to download model: $MS_MODEL_REPO"
         mkdir -p "$(dirname "$MODEL_DIR")"
-
-        if [[ -n "$HF_ENDPOINT" ]]; then
-            info "Using HuggingFace mirror: $HF_ENDPOINT"
-        fi
-
-        # Note: hf CLI doesn't support multiple --include flags properly
-        # Use Python API for selective download (more reliable)
 
         info "Downloading selected LLM (${LLM_QUANT}) + all submodels..."
         info "Total size: ~8.9 GB (vs. 79 GB full repo)"
 
-        # Ensure huggingface_hub is installed for Python API
-        if ! "$PYTHON_CMD" -c "import huggingface_hub" &>/dev/null; then
-            info "Installing huggingface_hub for selective download..."
-            $PIP_CMD install -U huggingface_hub $PIP_TRUSTED_HOSTS --progress-bar on || {
-                warn "Failed to install huggingface_hub, falling back to CLI download"
-                $hf_dl_cmd "$HF_MODEL_REPO" --local-dir "$MODEL_DIR" || {
+        # Ensure modelscope is installed for Python API
+        if ! "$PYTHON_CMD" -c "import modelscope" &>/dev/null; then
+            info "Installing modelscope for selective download..."
+            $PIP_CMD install -U modelscope $PIP_TRUSTED_HOSTS --progress-bar on || {
+                warn "Failed to install modelscope, falling back to CLI download"
+                $ms_dl_cmd --model "$MS_MODEL_REPO" --local_dir "$MODEL_DIR" || {
                     err "Model download failed"
                     return 1
                 }
@@ -934,18 +901,18 @@ download_models() {
         fi
 
         # Clean up any old temp scripts
-        rm -f /tmp/hf_selective_dl_*.py 2>/dev/null || true
+        rm -f /tmp/ms_selective_dl_*.py 2>/dev/null || true
 
         # Create Python script for selective download
         local py_script
-        py_script=$(mktemp /tmp/hf_selective_dl_XXXXXX)
+        py_script=$(mktemp /tmp/ms_selective_dl_XXXXXX)
         mv "$py_script" "$py_script.py"
         py_script="$py_script.py"
 
         cat > "$py_script" <<'PYEOF'
 import sys
 import os
-from huggingface_hub import snapshot_download
+from modelscope import snapshot_download
 
 repo_id = sys.argv[1]
 local_dir = sys.argv[2]
@@ -957,26 +924,20 @@ allow_patterns = [
     "vision/*",                          # Vision encoder (F16)
     "audio/*",                           # Audio encoder (F16)
     "tts/*",                             # TTS models (F16)
-    "token2wav-gguf/*",                  # Token2Wav models
+    "token2wav*/*",                      # Token2Wav models (modelscope may use different dir name)
     "*.md",                              # Documentation
     ".git*",                             # Git metadata
 ]
 
-# Read HF_ENDPOINT from environment (for mirror support)
-endpoint = os.environ.get("HF_ENDPOINT", None)
-
 print(f"Downloading with patterns: {allow_patterns}")
 print(f"Repo: {repo_id} -> {local_dir}")
-if endpoint:
-    print(f"Using HuggingFace mirror: {endpoint}")
 
 try:
     snapshot_download(
-        repo_id=repo_id,
+        model_id=repo_id,
         local_dir=local_dir,
         allow_patterns=allow_patterns,
         local_dir_use_symlinks=False,
-        endpoint=endpoint,  # Support HF_ENDPOINT for mirrors
     )
     print(f"\nDownload complete: {local_dir}")
 except Exception as e:
@@ -985,15 +946,15 @@ except Exception as e:
 PYEOF
 
         # Run Python script for selective download
-        "$PYTHON_CMD" "$py_script" "$HF_MODEL_REPO" "$MODEL_DIR" "$LLM_QUANT" || {
+        "$PYTHON_CMD" "$py_script" "$MS_MODEL_REPO" "$MODEL_DIR" "$LLM_QUANT" || {
             rm -f "$py_script"
             warn "Selective download failed, falling back to full download..."
-            warn "You can manually download only needed files from: ${HF_ENDPOINT:-https://huggingface.co}/${HF_MODEL_REPO}"
+            warn "You can manually download only needed files from: https://modelscope.cn/models/$MS_MODEL_REPO"
             echo ""
             warn "Proceeding with full download in 5 seconds (Ctrl+C to abort)..."
             sleep 5
 
-            $hf_dl_cmd "$HF_MODEL_REPO" --local-dir "$MODEL_DIR" || {
+            $ms_dl_cmd --model "$MS_MODEL_REPO" --local_dir "$MODEL_DIR" || {
                 err "Model download failed"
                 return 1
             }
@@ -1005,20 +966,15 @@ PYEOF
     fi
 
     # Fallback: prompt for manual download
-    local base_url="${HF_ENDPOINT:-https://huggingface.co}"
-    warn "huggingface-cli not found, please download the model manually:"
+    warn "modelscope not found, please download the model manually:"
     echo ""
-    echo "  Option 1: Install huggingface-cli for automatic download"
-    echo "    $PIP_CMD install -U huggingface_hub"
+    echo "  Option 1: Install modelscope for automatic download"
+    echo "    $PIP_CMD install -U modelscope"
     echo "    Then re-run this script"
     echo ""
     echo "  Option 2: Manual download"
-    echo "    Visit: $base_url/$HF_MODEL_REPO"
+    echo "    Visit: https://modelscope.cn/models/$MS_MODEL_REPO"
     echo "    Download all files to: $MODEL_DIR"
-    echo ""
-    echo "  Option 3: Use git lfs"
-    echo "    git lfs install"
-    echo "    git clone $base_url/$HF_MODEL_REPO $MODEL_DIR"
     echo ""
     return 1
 }
@@ -1099,10 +1055,13 @@ preflight_check() {
                     info "PEP 668 detected, reusing existing venv: $venv_dir"
                 else
                     warn "PEP 668 detected (externally-managed Python), auto-creating venv..."
-                    if ! $PYTHON_CMD -m venv "$venv_dir" 2>/dev/null; then
-                        err "Failed to create venv. Please install python3-venv:"
-                        err "  sudo apt install python3-full python3-venv"
-                        ok_flag=false
+                    if ! $PYTHON_CMD -m venv "$venv_dir" --upgrade-deps 2>/dev/null; then
+                        warn "venv creation failed, trying with ensurepip..."
+                        if ! $PYTHON_CMD -m venv "$venv_dir" --without-pip 2>/dev/null || ! "$venv_dir/bin/python" -m ensurepip --upgrade 2>/dev/null; then
+                            err "Failed to create venv. Please install python3-venv and python3-pip:"
+                            err "  sudo apt update && sudo apt install -y python3-full python3-venv python3-pip"
+                            ok_flag=false
+                        fi
                     else
                         ok "Virtual environment created: $venv_dir"
                     fi
@@ -1225,74 +1184,46 @@ preflight_check() {
     ok "Preflight checks passed"
 }
 
-# ======================== Sync LiveKit Config ========================
+# ======================== Check Windows LiveKit ========================
 
-# Ensure livekit.yaml keys match the script's LIVEKIT_API_KEY / LIVEKIT_API_SECRET
-update_livekit_keys() {
-    if [[ ! -f "$LIVEKIT_CONFIG" ]]; then
-        return
-    fi
-    # Replace the line "  devkey: <old_secret>" with the correct secret
-    if grep -q "^  ${LIVEKIT_API_KEY}:" "$LIVEKIT_CONFIG"; then
-        local current_secret
-        current_secret=$(grep "^  ${LIVEKIT_API_KEY}:" "$LIVEKIT_CONFIG" | awk '{print $2}' | tr -d '"' || true)
-        if [[ "$current_secret" != "$LIVEKIT_API_SECRET" ]]; then
-            sed -i.bak "s/^  ${LIVEKIT_API_KEY}: .*/  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}/" "$LIVEKIT_CONFIG"
-            rm -f "${LIVEKIT_CONFIG}.bak"
-            ok "Updated livekit.yaml API secret (was: ${current_secret:0:6}...)"
-        fi
-    fi
-}
-
-update_livekit_ip() {
-    local ip
-    ip=$(get_local_ip)
-    info "Detected local IP: $ip"
-
-    if grep -q "node_ip:" "$LIVEKIT_CONFIG"; then
-        sed -i.bak "s/node_ip: .*/node_ip: \"$ip\"/" "$LIVEKIT_CONFIG"
-        sed -i.bak "s/domain: .*/domain: \"$ip\"/" "$LIVEKIT_CONFIG"
-        rm -f "${LIVEKIT_CONFIG}.bak"
-        ok "Updated livekit.yaml node_ip and domain to $ip"
-    fi
-}
-
-update_livekit_port() {
-    if [[ ! -f "$LIVEKIT_CONFIG" ]]; then
-        return
-    fi
-    # Update port if different from LIVEKIT_PORT
-    local current_port
-    current_port=$(grep "^port:" "$LIVEKIT_CONFIG" | awk '{print $2}' || echo "7880")
-    if [[ "$current_port" != "$LIVEKIT_PORT" ]]; then
-        sed -i.bak "s/^port: .*/port: $LIVEKIT_PORT/" "$LIVEKIT_CONFIG"
-        rm -f "${LIVEKIT_CONFIG}.bak"
-        ok "Updated livekit.yaml port to $LIVEKIT_PORT (was: $current_port)"
-    fi
-}
-
-# ======================== Start LiveKit ========================
-
-start_livekit() {
+check_windows_livekit() {
     echo ""
-    info "========== [1/4] Starting LiveKit Server =========="
+    info "========== Checking Windows LiveKit =========="
 
-    if is_running "$LIVEKIT_PID"; then
-        warn "LiveKit is already running (PID: $(cat "$LIVEKIT_PID")), stopping first..."
-        kill_by_pidfile "$LIVEKIT_PID" "LiveKit"
+    # Try to connect to Windows LiveKit from WSL2
+    local livekit_ok=false
+    local max_retry=5
+    local retry=0
+
+    while [[ $retry -lt $max_retry ]]; do
+        if curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$LIVEKIT_PORT" 2>/dev/null | grep -q "200\|OK"; then
+            livekit_ok=true
+            break
+        fi
+        retry=$((retry + 1))
+        if [[ $retry -lt $max_retry ]]; then
+            info "Waiting for Windows LiveKit on 127.0.0.1:$LIVEKIT_PORT... ($retry/$max_retry)"
+            sleep 2
+        fi
+    done
+
+    if [[ "$livekit_ok" != "true" ]]; then
+        echo ""
+        err "Windows LiveKit is not running on 127.0.0.1:$LIVEKIT_PORT"
+        echo ""
+        echo "  🔧 Please start Windows LiveKit first:"
+        echo "     1. Open PowerShell (Administrator)"
+        echo "     2. cd D:\\MiniCPM-V-CookBook-1\\demo\\web_demo\\WebRTC_Demo"
+        echo "     3. .\\start-livekit-windows.ps1"
+        echo ""
+        echo "  🔧 Requirements:"
+        echo "     - WSL2 mirrored mode enabled (.wslconfig -> networkingMode=mirrored)"
+        echo "     - Windows LiveKit binary: livekit-server.exe"
+        echo ""
+        return 1
     fi
 
-    ensure_port_free "$LIVEKIT_PORT" "LiveKit" || return 1
-
-    update_livekit_keys
-    update_livekit_port
-    update_livekit_ip
-
-    livekit-server --config "$LIVEKIT_CONFIG" \
-        > "$LIVEKIT_LOG" 2>&1 &
-    echo $! > "$LIVEKIT_PID"
-
-    wait_for_port "$LIVEKIT_PORT" "LiveKit" 10
+    ok "Windows LiveKit is running on 127.0.0.1:$LIVEKIT_PORT"
 }
 
 # ======================== Start Backend ========================
@@ -1355,7 +1286,7 @@ start_backend() {
     )
 
     # Backend startup is slower (VAD model warm-up ~5s), allow 30s timeout
-    wait_for_port "$BACKEND_PORT" "Backend" 30
+    wait_for_port "$BACKEND_PORT" "Backend" 60
 
     # Post-startup health check verification
     sleep 2
@@ -1546,9 +1477,11 @@ stop_all() {
     pkill -f "minicpmo_cpp_http_server" 2>/dev/null || true
     pkill -f "llama-server.*$CPP_LLAMA_PORT" 2>/dev/null || true
     kill_by_pidfile "$BACKEND_PID"    "Backend"
-    kill_by_pidfile "$LIVEKIT_PID"    "LiveKit"
     echo ""
-    ok "All services stopped"
+    ok "All WSL2 services stopped"
+    echo ""
+    info "Note: Windows LiveKit is NOT stopped by this script."
+    info "      To stop Windows LiveKit, run: .\\stop-livekit-windows.ps1"
 }
 
 # ======================== Show Status ========================
@@ -1558,11 +1491,10 @@ show_status() {
     info "Service status:"
     echo "  -------------------------------------------------------"
 
-    for svc in livekit backend cpp_server frontend; do
+    for svc in backend cpp_server frontend; do
         local pidfile="$PID_DIR/${svc}.pid"
         local port_var
         case $svc in
-            livekit)    port_var=$LIVEKIT_PORT ;;
             backend)    port_var=$BACKEND_PORT ;;
             cpp_server) port_var=$CPP_SERVER_PORT ;;
             frontend)   port_var=$FRONTEND_PORT ;;
@@ -1579,7 +1511,6 @@ show_status() {
     echo "  -------------------------------------------------------"
     echo ""
     info "Log files:"
-    echo "  LiveKit:       $LIVEKIT_LOG"
     echo "  Backend:       $BACKEND_LOG"
     echo "  C++ Inference: $CPP_SERVER_LOG"
     echo "  Frontend:      $FRONTEND_LOG"
@@ -1590,7 +1521,7 @@ show_status() {
     echo "  Frontend:      https://$local_ip:$FRONTEND_PORT  (accept self-signed certificate on first visit)"
     echo "  Backend API:   http://$local_ip:$BACKEND_PORT"
     echo "  Backend Docs:  http://$local_ip:$BACKEND_PORT/docs"
-    echo "  LiveKit:       ws://$local_ip:$LIVEKIT_PORT"
+    echo "  LiveKit:       ws://127.0.0.1:$LIVEKIT_PORT  (running on Windows)"
     echo "  Inference:     http://$local_ip:$CPP_SERVER_PORT"
     echo "  Inference Health: http://$local_ip:$CPP_HEALTH_PORT/health"
 }
@@ -1606,20 +1537,50 @@ start_all() {
 
     mkdir -p "$PID_DIR" "$LOG_DIR"
 
-    # Auto-allocate available ports if AUTO_PORT=1
+    # 检查并释放端口（固定端口策略）
     auto_allocate_ports
 
     preflight_check
-    start_livekit
+    # 🔧 [LiveKit Cloud] 不需要本地 LiveKit，跳过检查
+    # check_windows_livekit || return 1
     start_backend
     start_cpp_server
     start_frontend
 
     echo ""
     echo "=============================================="
-    ok "All services started successfully!"
+    ok "All WSL2 services started successfully!"
     echo "=============================================="
+    echo ""
+    info "Note: Windows LiveKit is running separately."
     show_status
+
+    # Keep the script running to prevent SIGHUP from killing background services
+    echo ""
+    info "Services are running in the background. Press Ctrl+C to stop all services."
+    trap "echo ''; info 'Stopping all services...'; stop_all; exit 0" INT TERM
+
+    # Wait indefinitely (reap zombie processes if any)
+    while true; do
+        wait || true
+        sleep 1
+        # If no services are running, exit automatically
+        local any_running=false
+        for pidfile in "$BACKEND_PID" "$CPP_SERVER_PID" "$FRONTEND_PID"; do
+            if [[ -f "$pidfile" ]]; then
+                local pid
+                pid=$(cat "$pidfile" 2>/dev/null || true)
+                if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                    any_running=true
+                    break
+                fi
+            fi
+        done
+        if [[ "$any_running" != "true" ]]; then
+            warn "All background services have exited unexpectedly"
+            break
+        fi
+    done
 }
 
 # ======================== Main Entry ========================
@@ -1642,11 +1603,10 @@ case "${1:-start}" in
     logs)
         # Shortcut to view logs: bash one_click.sh logs [livekit|backend|cpp_server|frontend]
         case "${2:-all}" in
-            livekit)    tail -f "$LIVEKIT_LOG" ;;
             backend)    tail -f "$BACKEND_LOG" ;;
             cpp|cpp_server) tail -f "$CPP_SERVER_LOG" ;;
             frontend)   tail -f "$FRONTEND_LOG" ;;
-            all)        tail -f "$LIVEKIT_LOG" "$BACKEND_LOG" "$CPP_SERVER_LOG" "$FRONTEND_LOG" ;;
+            all)        tail -f "$BACKEND_LOG" "$CPP_SERVER_LOG" "$FRONTEND_LOG" ;;
         esac
         ;;
     download)

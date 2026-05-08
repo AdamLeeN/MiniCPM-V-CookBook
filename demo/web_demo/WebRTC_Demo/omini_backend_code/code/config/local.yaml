@@ -15,10 +15,10 @@ redis:
 
 # LiveKit配置 - 本地原生部署（无 Docker）
 livekit:
-  # url: "ws://livekit:7880"  # Docker Compose 服务名（原始配置）
-  url: "ws://localhost:7880"
-  api_key: "devkey"
-  api_secret: "secretsecretsecretsecretsecretsecret"
+  # 🔧 [LiveKit Cloud] 使用官方云服务
+  url: "wss://test-ummgc1t8.livekit.cloud"
+  api_key: "API6QFxm5wYzKns"
+  api_secret: "uLov2kCeGfuCKWEHRfCyW5nz6DlNCWKxQ2OBUnwXVvJA"
 
 # 服务器配置
 server:

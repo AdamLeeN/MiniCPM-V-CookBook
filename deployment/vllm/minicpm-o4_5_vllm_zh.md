@@ -5,9 +5,18 @@
 ### 1.1 安装 vLLM
 
 > [!NOTE]
-> MiniCPM-o4.5 目前尚未在官方发布的 vLLM 版本中得到支持。
+> MiniCPM-o4.5 的支持已经合入 vLLM 官方仓库（[PR #33431](https://github.com/vllm-project/vllm/pull/33431)），并从 vLLM **v0.16.0** 起正式发布。
 >
-> 您需要从修改过的源码安装 vLLM。详见 1.2 节的安装步骤。
+> 现在可以直接通过 PyPI 安装官方 vLLM，无需再从 `tc-mb/vllm` 的 `Support-MiniCPM-o-4.5` 分支编译（代码合入官方后，该分支已删除）。
+
+```bash
+# 创建干净的 conda 环境
+conda create -n vllm-o45 python=3.10
+conda activate vllm-o45
+
+# 从 PyPI 安装 vLLM（>= 0.16.0）
+pip install "vllm>=0.16.0"
+```
 
 进行视频推理时，需要安装相应的视频模块：
 ```bash
@@ -19,19 +28,18 @@ pip install vllm[video]
 pip install vllm[audio]
 ```
 
-### 1.2 从源码安装 vLLM（必需）
+### 1.2 从源码安装 vLLM（可选）
 
-由于官方 vLLM 尚未支持 MiniCPM-o4.5，您需要从修改过的源码安装：
+如果您希望使用 `main` 分支的最新特性，也可以从官方源码安装 vLLM：
 
 ```bash
 # 创建干净的 conda 环境
 conda create -n vllm-o45 python=3.10
 conda activate vllm-o45
 
-# 克隆并安装修改过的 vLLM
-git clone https://github.com/tc-mb/vllm.git
+# 克隆官方 vLLM 仓库
+git clone https://github.com/vllm-project/vllm.git
 cd vllm
-git checkout Support-MiniCPM-o-4.5
 
 # 使用预编译选项加速构建
 MAX_JOBS=6 VLLM_USE_PRECOMPILED=1 pip install --editable . -v --progress-bar=on
@@ -39,6 +47,12 @@ MAX_JOBS=6 VLLM_USE_PRECOMPILED=1 pip install --editable . -v --progress-bar=on
 # 安装视频和音频模块
 pip install vllm[video]
 pip install vllm[audio]
+```
+
+安装完成后可以使用以下命令验证：
+
+```bash
+python -c "import vllm; print(vllm.__version__)"
 ```
 
 

@@ -5,9 +5,18 @@
 ### 1.1 Install vLLM
 
 > [!NOTE]
-> MiniCPM-o4.5 is not yet supported in the officially released vLLM version.
+> MiniCPM-o4.5 support has been merged into the official vLLM ([PR #33431](https://github.com/vllm-project/vllm/pull/33431)) and is included starting from vLLM **v0.16.0**.
 >
-> You need to install vLLM from a modified source. See section 1.2 for step-by-step commands.
+> You can now install vLLM directly from PyPI — there is no longer a need to build from the `tc-mb/vllm` `Support-MiniCPM-o-4.5` branch (which has been removed since the code was upstreamed).
+
+```bash
+# Create a clean conda environment
+conda create -n vllm-o45 python=3.10
+conda activate vllm-o45
+
+# Install vLLM (>= 0.16.0) from PyPI
+pip install "vllm>=0.16.0"
+```
 
 For video inference, install the video module:
 ```bash
@@ -19,19 +28,18 @@ For audio inference, install the audio module:
 pip install vllm[audio]
 ```
 
-### 1.2 Install vLLM from Source (Required)
+### 1.2 Install vLLM from Source (Optional)
 
-Since the official vLLM does not yet support MiniCPM-o4.5, you need to install from a modified source:
+If you want to use the latest features from the `main` branch, you can also install vLLM from the official source:
 
 ```bash
 # Create a clean conda environment
 conda create -n vllm-o45 python=3.10
 conda activate vllm-o45
 
-# Clone and install the modified vLLM
-git clone https://github.com/tc-mb/vllm.git
+# Clone the official vLLM repo
+git clone https://github.com/vllm-project/vllm.git
 cd vllm
-git checkout Support-MiniCPM-o-4.5
 
 # Install with pre-compiled option for faster build
 MAX_JOBS=6 VLLM_USE_PRECOMPILED=1 pip install --editable . -v --progress-bar=on
@@ -39,6 +47,12 @@ MAX_JOBS=6 VLLM_USE_PRECOMPILED=1 pip install --editable . -v --progress-bar=on
 # Install video and audio modules
 pip install vllm[video]
 pip install vllm[audio]
+```
+
+You can verify the installation with:
+
+```bash
+python -c "import vllm; print(vllm.__version__)"
 ```
 
 ## 2. API Service Deployment
