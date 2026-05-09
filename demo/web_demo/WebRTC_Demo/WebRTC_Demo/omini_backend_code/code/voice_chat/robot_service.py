@@ -15,6 +15,7 @@ from enhanced_logging_config import get_enhanced_logger, set_request_trace
 from services.inference_service_manager import InferenceService, InferenceServiceManager
 from voice_chat.entity.session import SharedSessionState
 from voice_chat.entity.token import LoginRequest
+from voice_chat.greeting_service import get_global_greeting, is_global_greeting_ready
 from voice_chat.livekit_room import LiveKitRoom
 from voice_chat.model_call import MiniCpmModel
 from voice_chat.omni_stream import OmniStream
@@ -179,11 +180,20 @@ async def room_start_monitor(session_id: str, liveKitToken: str, request: LoginR
         liveKit_room = LiveKitRoom(liveKit_token=liveKitToken, request=request, 
         audio_input_queue=audio_input_queue, audio_output_queue=audio_output_queue, inference_service=inference_service, 
         inference_service_manager=inference_service_manager, model_cpm=model_cpm, stop_event=stop_event, 
-        shared_state=shared_state)
+        shared_state=shared_state, first_tts=first_tts)
         source = await liveKit_room.init_room_listener()
 
         # 初始化模型配置
-        asyncio.create_task(model_cpm.model_init())
+        await model_cpm.model_init()
+        
+        # 🔧 [开场白] 模型初始化完成后，再设置开场白音频
+        # 这样 _async_stream_detail 主循环在检测到 greeting_pcm 时，模型已经准备好了
+        if is_global_greeting_ready():
+            pcm_bytes, sr, text = get_global_greeting()
+            omni_stream.greeting_pcm = pcm_bytes
+            logger.info(f"[开场白] 已设置 OmniStream 开场白音频: {len(pcm_bytes)} bytes, {sr}Hz, 文本: {text}")
+        else:
+            logger.warning("[开场白] 全局预生成音频未就绪，将无开场白")
 
         mini_server = Mini_Server(
             stop_event=stop_event,

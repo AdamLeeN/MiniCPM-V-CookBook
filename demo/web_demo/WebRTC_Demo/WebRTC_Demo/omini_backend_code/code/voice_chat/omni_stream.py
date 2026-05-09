@@ -9,6 +9,7 @@ from voice_chat.entity.token import LoginRequest
 from voice_chat.entity.session import SharedSessionState
 from voice_chat.vad import vad_utils
 import time
+from typing import Optional
 
 from enhanced_logging_config import get_enhanced_logger, set_request_trace
 from voice_chat.model_call import MiniCpmModel
@@ -71,6 +72,9 @@ class OmniStream:
         voice_chat_config = get_voice_chat_settings()
         self.enable_voice_interruption = voice_chat_config.enable_voice_interruption
         self.voice_interruption_threshold = voice_chat_config.voice_interruption_threshold
+        
+        # 🔧 [开场白] 开场白音频（PCM 48kHz int16），通过 prefill 送给模型触发回复
+        self.greeting_pcm: Optional[bytes] = None
 
     async def _collect_audio_data(self) -> np.ndarray:
         """
@@ -194,6 +198,10 @@ class OmniStream:
             logger.error(f"模型生成错误: {str(e)}")
         finally:
             await self.text_output_queue.put("<state><generate_end>")
+            # 🔧 [开场白] 单工模式下，生成完成后设置 play_end_event
+            if self.model_cpm.model_type == ModelType.SIMPLEX:
+                await self.model_cpm.play_end()
+                logger.info("[开场白] play_end_event 已设置，可以开始下一轮对话")
 
     def _clear_audio_queues(self) -> None:
         """
@@ -205,6 +213,43 @@ class OmniStream:
                 self.audio_input_queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
+    
+    async def _trigger_greeting(self):
+        """
+        🔧 [开场白] 使用预生成音频触发模型的开场白回复
+        
+        流程:
+        1. 将预生成音频通过 prefill 发送给模型（当作用户说的话）
+        2. 调用 _handle_model_generate 触发模型生成回复
+        3. 模型生成的语音就是开场白
+        """
+        try:
+            if self.greeting_pcm is None or len(self.greeting_pcm) == 0:
+                logger.info("[开场白] 无预生成音频，跳过")
+                return
+            
+            logger.info(f"[开场白] 开始触发模型开场白回复，音频大小: {len(self.greeting_pcm)} bytes")
+            
+            # 将 PCM bytes 转为 numpy 数组 (48kHz int16)
+            audio_array = np.frombuffer(self.greeting_pcm, dtype=np.int16)
+            logger.info(f"[开场白] 音频数组形状: {audio_array.shape}, dtype: {audio_array.dtype}")
+            
+            # Step 1: prefill 音频（当作用户说的话）
+            await self.model_cpm.model_prefill(
+                session_id=self.session_id,
+                audio_data=audio_array,
+                image_data=None,
+                last_chunk=True
+            )
+            logger.info("[开场白] prefill 完成，音频已发送给模型")
+            
+            # Step 2: 触发模型生成回复（复用 _handle_model_generate）
+            logger.info("[开场白] 调用 _handle_model_generate 触发模型回复...")
+            await self._handle_model_generate()
+            logger.info("[开场白] 模型开场白回复完成")
+                    
+        except Exception as e:
+            logger.error(f"[开场白] 触发模型回复失败: {e}", exc_info=True)
     
     async def _async_stream_detail(self, audio_buffer):
         """
@@ -224,6 +269,13 @@ class OmniStream:
         target_duration = 1000  # 目标缓冲区时长（毫秒）
         while not self.stop_event.is_set():
             try:
+                # 🔧 [开场白] 检查是否有预生成音频需要触发
+                if self.greeting_pcm is not None and len(self.greeting_pcm) > 0:
+                    logger.info("[开场白] 检测到预生成音频，触发开场白...")
+                    await self._trigger_greeting()
+                    # 清空，避免重复触发
+                    self.greeting_pcm = None
+                
                 start_time = time.time()
                 
                 # 1. 收集音频数据

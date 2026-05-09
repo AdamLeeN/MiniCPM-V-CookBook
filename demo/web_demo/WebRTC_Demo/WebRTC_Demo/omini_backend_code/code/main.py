@@ -74,6 +74,18 @@ async def lifespan(app: FastAPI):
         logger.error(f"VAD模型预加载异常: {e}")
         logger.warning("VAD模型将在首次使用时加载，可能影响首次检测性能")
     
+    # 🔧 [开场白] 预生成开场白音频（全局缓存）
+    try:
+        from voice_chat.greeting_service import init_global_greeting
+        greeting_success = await init_global_greeting(customer_name="张三")
+        if greeting_success:
+            logger.info("[开场白] 全局预生成成功，用户接入后将立即播放")
+        else:
+            logger.warning("[开场白] 全局预生成失败，将无开场白")
+    except Exception as e:
+        logger.error(f"[开场白] 预生成异常: {e}")
+        logger.warning("[开场白] 将在首次使用时尝试生成")
+    
     # 启动推理服务管理后台任务
     try:
         import asyncio

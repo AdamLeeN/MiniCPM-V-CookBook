@@ -1,6 +1,7 @@
 from collections import deque
 import json
 import time
+from typing import Optional
 from livekit import rtc
 import asyncio
 import cv2
@@ -30,7 +31,8 @@ class LiveKitRoom:
     inference_service_manager: InferenceServiceManager,
     model_cpm:MiniCpmModel,
     stop_event: asyncio.Event,
-    shared_state: SharedSessionState):
+    shared_state: SharedSessionState,
+    first_tts: asyncio.Event = None):
         self.liveKit_token = liveKit_token
         self.inference_service = inference_service
         self.room = None
@@ -60,6 +62,9 @@ class LiveKitRoom:
         
         # 前端用户连接事件，用于等待用户进入房间后再发送关键消息
         self.participant_connected_event = asyncio.Event()
+        
+        # 🔧 [开场白] first_tts 事件，用于控制音频发送
+        self.first_tts = first_tts
 
 
     # 初始化房间监听
@@ -357,7 +362,7 @@ class LiveKitRoom:
                     asyncio.create_task(self.send_silence_audio())
                 except asyncio.TimeoutError:
                     logger.info(f"等待前端用户连接超时(5s)，仍然发送消息: {text_message}")
-        
+            
         for attempt in range(max_retries):
             try:
                 # 检查连接状态
