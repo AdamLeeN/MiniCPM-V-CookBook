@@ -75,8 +75,30 @@ class Mini_Server:
 
             while not self.stop_event.is_set():
                 try:
+                    # 🔧 [打断] 检查是否需要停止播放
+                    if self.liveKitRoom.stop_playing_event.is_set():
+                        if remaining_audio is not None:
+                            logger.info(f"[打断] 清空剩余音频: {len(remaining_audio)} samples")
+                            remaining_audio = None
+                        # 清空队列中待播放的音频
+                        while not self.audio_output_queue.empty():
+                            try:
+                                self.audio_output_queue.get_nowait()
+                            except asyncio.QueueEmpty:
+                                break
+                        # 🔧 [打断] 清空 LiveKit AudioSource 的内部缓冲区
+                        source.clear_queue()
+                        logger.info(f"[打断] LiveKit 音频队列已清空，queued_duration: {source.queued_duration}")
+                        self.liveKitRoom.stop_playing_event.clear()
+                    
                     # 策略1：如果有剩余音频且足够发送，先发送剩余音频
                     if remaining_audio is not None and len(remaining_audio) >= self.UPDATE_SIZE:
+                        # 🔧 [打断] 在发送 remaining_audio 前也检查打断
+                        if self.liveKitRoom.stop_playing_event.is_set():
+                            logger.info(f"[打断] 清空remaining_audio策略1: {len(remaining_audio)} samples")
+                            remaining_audio = None
+                            self.liveKitRoom.stop_playing_event.clear()
+                            continue
                         chunk_to_send = remaining_audio[:self.UPDATE_SIZE]
                         np.copyto(audio_data, chunk_to_send)
                         await source.capture_frame(audio_frame)
@@ -106,6 +128,14 @@ class Mini_Server:
                         
                         # 循环发送所有完整的音频片段
                         while len(combined_audio) >= self.UPDATE_SIZE:
+                            # 🔧 [打断] 检查是否需要停止播放
+                            if self.liveKitRoom.stop_playing_event.is_set():
+                                logger.info("[打断] 停止发送音频片段")
+                                combined_audio = np.array([], dtype=np.int16)
+                                remaining_audio = None
+                                self.liveKitRoom.stop_playing_event.clear()
+                                break
+                            
                             chunk_to_send = combined_audio[:self.UPDATE_SIZE]
                             np.copyto(audio_data, chunk_to_send)
                             await source.capture_frame(audio_frame)
@@ -123,14 +153,20 @@ class Mini_Server:
                     except asyncio.TimeoutError:
                         # 策略3：超时无新数据，如果模型不再生成，发送剩余音频（即使不足UPDATE_SIZE）
                         if remaining_audio is not None and not model_generating_flag.is_set():
-                            # 用零填充到UPDATE_SIZE
-                            padded_audio = np.zeros(self.UPDATE_SIZE, dtype=np.int16)
-                            padded_audio[:len(remaining_audio)] = remaining_audio
-                            np.copyto(audio_data, padded_audio)
-                            await source.capture_frame(audio_frame)
-                            frame_count += 1
-                            remaining_audio = None
-                            logger.debug(f"发送填充后的剩余音频")
+                            # 🔧 [打断] 在发送填充音频前检查打断
+                            if self.liveKitRoom.stop_playing_event.is_set():
+                                logger.info(f"[打断] 清空remaining_audio策略3: {len(remaining_audio)} samples")
+                                remaining_audio = None
+                                self.liveKitRoom.stop_playing_event.clear()
+                            else:
+                                # 用零填充到UPDATE_SIZE
+                                padded_audio = np.zeros(self.UPDATE_SIZE, dtype=np.int16)
+                                padded_audio[:len(remaining_audio)] = remaining_audio
+                                np.copyto(audio_data, padded_audio)
+                                await source.capture_frame(audio_frame)
+                                frame_count += 1
+                                remaining_audio = None
+                                logger.debug(f"发送填充后的剩余音频")
                         # 短暂让出CPU
                         await asyncio.sleep(0)
                         
@@ -194,6 +230,10 @@ async def room_start_monitor(session_id: str, liveKitToken: str, request: LoginR
             logger.info(f"[开场白] 已设置 OmniStream 开场白音频: {len(pcm_bytes)} bytes, {sr}Hz, 文本: {text}")
         else:
             logger.warning("[开场白] 全局预生成音频未就绪，将无开场白")
+        
+        # 🔧 [开场白] 通知 _async_stream_detail 模型初始化完成
+        omni_stream.model_init_done_event.set()
+        logger.info("[开场白] model_init_done_event 已设置")
 
         mini_server = Mini_Server(
             stop_event=stop_event,

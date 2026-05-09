@@ -38,6 +38,8 @@ class MiniCpmModel ():
      self.play_end_event.set()
      self.shared_state = shared_state
      self.model_generating_flag = model_generating_flag
+     # 🔧 [打断] 打断事件标志，用于通知生成循环停止放数据
+     self.break_event = asyncio.Event()
 
    async def model_init(self):
         try:
@@ -203,31 +205,57 @@ class MiniCpmModel ():
           self.model_generating_flag.clear()
 
    async def streaming_break(self, session_id: str, text: str = ""):
+        """
+        打断当前输出
+        
+        1. 调用 C++ break 接口停止模型生成
+        2. 清空 audio_output_queue 停止音频播放
+        3. 重置所有状态标志
+        """
         try:
             data = None
+            
+            # 🔧 [打断] 触发停止播放事件，让 output_audio 清空剩余音频
+            # 注意: 这里不直接操作 liveKitRoom，而是通过事件通知
+            
+            # 🔧 [打断] 无论模型是否在生成，都清空音频队列
+            logger.info("[打断] 清空音频输出队列...")
+            cleared_count = 0
+            while not self.audio_output_queue.empty():
+                try:
+                    self.audio_output_queue.get_nowait()
+                    cleared_count += 1
+                except asyncio.QueueEmpty:
+                    break
+            logger.info(f"[打断] 清空了 {cleared_count} 个音频块")
+            
+            # 🔧 [打断] 设置打断事件，通知生成循环停止放数据
+            self.break_event.set()
+            
             if not self.model_generating_flag.is_set():
-                logger.info(f"模型和前端已经输出结束,忽略break")                
+                logger.info(f"[打断] 模型和前端已经输出结束,忽略break")                
             else:
                 response = await self.http_util.post(
                     url=f"{self.break_url}/omni/break",
                     headers={'Content-Type': 'application/json'}
                     )
                 # 回到模型聆听中
-                logger.info(f"模型打断成功, 回到模型聆听中, response={response}")
+                logger.info(f"[打断] 模型打断成功, response={response}")
                 data = response['data']
                 self.play_end_event.set()
-            # 清空audio_output_queue
-            while not self.audio_output_queue.empty():
-                self.audio_output_queue.get_nowait()
+            
             await self.text_output_queue.put("<state><session_break>")
             return data
         except Exception as e:
-            logger.error(f"Omni break请求异常: {str(e)}")
+            logger.error(f"[打断] 请求异常: {str(e)}")
         finally:
              # 问题回答结束，重置vad检测的标志位
             self.vad_stream_started = False
             self.play_end_event.set()
-            await self.shared_state.increment_round()
+            self.model_generating_flag.clear()
+            # 🔧 [打断] 重置打断事件，为下一次打断做准备
+            self.break_event.clear()
+            logger.info("[打断] 状态已重置: play_end_event=set, model_generating_flag=clear, break_event=clear")
 
    async def streaming_stop(self, session_id: str):
         try:

@@ -65,6 +65,9 @@ class LiveKitRoom:
         
         # 🔧 [开场白] first_tts 事件，用于控制音频发送
         self.first_tts = first_tts
+        
+        # 🔧 [打断] 停止播放事件，用于打断时清空音频
+        self.stop_playing_event = asyncio.Event()
 
 
     # 初始化房间监听
@@ -316,6 +319,9 @@ class LiveKitRoom:
                 await self.push_text_output("<state><session_stop>")
             elif json_data.get("interface") == "break":
                 logger.info("======= 收到单轮打断指令 =======")
+                # 🔧 [打断] 设置停止播放事件，让 output_audio 立即停止
+                self.stop_playing_event.set()
+                logger.info("[打断] stop_playing_event 已设置")
                 await self.model_cpm.streaming_break(self.session_id, text=f"用户打断, 当前轮次: {await self.shared_state.get_round()}")
                 logger.info("======= 当前轮对话已打断 =======")
             else:

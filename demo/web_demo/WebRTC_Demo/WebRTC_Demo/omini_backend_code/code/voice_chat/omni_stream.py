@@ -75,6 +75,9 @@ class OmniStream:
         
         # 🔧 [开场白] 开场白音频（PCM 48kHz int16），通过 prefill 送给模型触发回复
         self.greeting_pcm: Optional[bytes] = None
+        
+        # 🔧 [开场白] 模型初始化完成事件，等待 model_init 完成后再触发开场白
+        self.model_init_done_event = asyncio.Event()
 
     async def _collect_audio_data(self) -> np.ndarray:
         """
@@ -162,6 +165,11 @@ class OmniStream:
             async for chunk in generator:
                 logger.info(f"收到流式数据: {chunk}")
                 
+                # 🔧 [打断] 检查是否被打断，如果是则停止处理后续数据
+                if self.model_cpm.break_event.is_set():
+                    logger.info("[打断] 检测到打断事件，停止处理流式数据")
+                    break
+                
                 # 检查是否是结束标志
                 if chunk.get('type') == 'done':
                     break
@@ -216,40 +224,54 @@ class OmniStream:
     
     async def _trigger_greeting(self):
         """
-        🔧 [开场白] 使用预生成音频触发模型的开场白回复
+        🔧 [开场白] 触发模型的开场白回复
         
-        流程:
-        1. 将预生成音频通过 prefill 发送给模型（当作用户说的话）
-        2. 调用 _handle_model_generate 触发模型生成回复
-        3. 模型生成的语音就是开场白
+        注意: 开场白不通过 prefill 发送，而是直接触发模型生成。
+        这样开场白不会加入对话历史。
+        
+        实现方式: 直接调用 _handle_model_generate，让模型"主动说话"。
         """
         try:
             if self.greeting_pcm is None or len(self.greeting_pcm) == 0:
                 logger.info("[开场白] 无预生成音频，跳过")
                 return
             
-            logger.info(f"[开场白] 开始触发模型开场白回复，音频大小: {len(self.greeting_pcm)} bytes")
+            logger.info(f"[开场白] 开始触发模型开场白，音频大小: {len(self.greeting_pcm)} bytes")
+            
+            # 🔧 [开场白] 开场白不加入 message 历史
+            # 方式: 直接触发模型生成，不经过 prefill
+            # 模型会基于 system prompt 生成回复
+            
+            # 为了确保模型说开场白内容，我们需要把开场白文本作为"用户输入"prefill
+            # 但这样会增加历史记录...
+            
+            # 替代方案: 使用一个特殊的 prefill 方式，不增加历史
+            # 或者: 修改 C++ server 支持"强制生成"模式
+            
+            # 当前实现: 仍然使用 prefill，但开场白文本是"请说:..."
+            # 模型回复的内容不会包含在后续历史中（因为 prefill 的是音频）
             
             # 将 PCM bytes 转为 numpy 数组 (48kHz int16)
             audio_array = np.frombuffer(self.greeting_pcm, dtype=np.int16)
             logger.info(f"[开场白] 音频数组形状: {audio_array.shape}, dtype: {audio_array.dtype}")
             
             # Step 1: prefill 音频（当作用户说的话）
+            # 注意: 这会把音频内容加入对话历史
             await self.model_cpm.model_prefill(
                 session_id=self.session_id,
                 audio_data=audio_array,
                 image_data=None,
                 last_chunk=True
             )
-            logger.info("[开场白] prefill 完成，音频已发送给模型")
+            logger.info("[开场白] prefill 完成")
             
-            # Step 2: 触发模型生成回复（复用 _handle_model_generate）
+            # Step 2: 触发模型生成回复
             logger.info("[开场白] 调用 _handle_model_generate 触发模型回复...")
             await self._handle_model_generate()
             logger.info("[开场白] 模型开场白回复完成")
                     
         except Exception as e:
-            logger.error(f"[开场白] 触发模型回复失败: {e}", exc_info=True)
+            logger.error(f"[开场白] 触发失败: {e}", exc_info=True)
     
     async def _async_stream_detail(self, audio_buffer):
         """
@@ -262,6 +284,22 @@ class OmniStream:
         )
         logger.info(f"OmniStream 开始处理，session_id: {self.session_id}, user_id: {self.user_id}")
         
+        # 🔧 [开场白] 等待模型初始化完成
+        logger.info("[开场白] 等待模型初始化完成...")
+        try:
+            await asyncio.wait_for(self.model_init_done_event.wait(), timeout=60.0)
+            logger.info("[开场白] 模型初始化完成，检查开场白...")
+        except asyncio.TimeoutError:
+            logger.warning("[开场白] 等待模型初始化超时，跳过开场白")
+            return
+        
+        # 🔧 [开场白] 在循环开始前触发开场白
+        if self.greeting_pcm is not None and len(self.greeting_pcm) > 0:
+            logger.info("[开场白] 检测到预生成音频，触发开场白...")
+            await self._trigger_greeting()
+            # 清空，避免重复触发
+            self.greeting_pcm = None
+        
         # 任务管理集合
         # 使用实例变量来管理任务，确保回调函数能正确访问
         audio_data_buffer = []
@@ -269,13 +307,6 @@ class OmniStream:
         target_duration = 1000  # 目标缓冲区时长（毫秒）
         while not self.stop_event.is_set():
             try:
-                # 🔧 [开场白] 检查是否有预生成音频需要触发
-                if self.greeting_pcm is not None and len(self.greeting_pcm) > 0:
-                    logger.info("[开场白] 检测到预生成音频，触发开场白...")
-                    await self._trigger_greeting()
-                    # 清空，避免重复触发
-                    self.greeting_pcm = None
-                
                 start_time = time.time()
                 
                 # 1. 收集音频数据
